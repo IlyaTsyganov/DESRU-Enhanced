@@ -23,3 +23,4 @@ These are all the version names that are valid for the version swapper.
   6.66 Rev 2.2
   6.66 Rev 3
   6.66 Rev 3.1
+  6.66 Rev 3.2
