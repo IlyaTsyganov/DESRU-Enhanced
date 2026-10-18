@@ -45,7 +45,17 @@ namespace DESpeedrunUtil.Memory {
         public bool TrainerSupported { get; private set; } = true;
         private HorizontalSpeedSampler? _speedSampler;
         public HorizontalSpeedSnapshot HorizontalSpeed => _speedSampler?.Snapshot ?? HorizontalSpeedSnapshot.Empty;
-        public bool GroundContactSupported => _currentOffsets.GroundPlaneFromVelocity > 0;
+        private int? _resolvedGroundOffset;
+        private int GroundOffset => _resolvedGroundOffset ?? _currentOffsets.GroundPlaneFromVelocity;
+        public bool GroundContactSupported => GroundOffset > 0;
+        internal void SetGroundContactOffset(int offset) => _resolvedGroundOffset = offset >= 0 && offset < 1024 ? offset : 0;
+        internal IntPtr ReadPlayerAddress() {
+            if(_currentOffsets.Velocity == 0) return IntPtr.Zero;
+            int playerOffset = int.TryParse(Version.Name[..1], out int major) && major >= 3 ? 0x5C0 : 0x598;
+            return _game.ReadPointer(_game.MainModule!.BaseAddress + _currentOffsets.Velocity, true, out var root) && root != IntPtr.Zero &&
+                _game.ReadPointer(root + 0x1510, true, out var slot) && slot != IntPtr.Zero &&
+                _game.ReadPointer(slot + playerOffset, true, out var player) ? player : IntPtr.Zero;
+        }
         public bool FirstRun { get; set; } = true;
         public bool EnableOSD { get; set; } = false;
         public bool EnableCheats { get; set; } = false;
@@ -457,7 +467,7 @@ namespace DESpeedrunUtil.Memory {
         private void ReadHorizontalSpeed() {
             bool enabled = Properties.Settings.Default.SpeedometersEnabled && (Properties.Settings.Default.CurrentSpeedOverlayEnabled || Properties.Settings.Default.LandingSpeedOverlayEnabled);
             if(enabled) _speedSampler ??= new HorizontalSpeedSampler(_game);
-            _speedSampler?.SetContext(_velocityPtr, _currentOffsets.GroundPlaneFromVelocity, enabled && !IsLoadingOrInMenu());
+            _speedSampler?.SetContext(_velocityPtr, GroundOffset, enabled && !IsLoadingOrInMenu());
         }
 
         internal void StopSpeedSampler() { _speedSampler?.Dispose(); _speedSampler = null; }

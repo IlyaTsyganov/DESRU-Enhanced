@@ -153,6 +153,35 @@ internal static class LowHealthTintTests {
             process.WriteBytes(state + LowHealthTintCode.ScaleOffset, BitConverter.GetBytes(0f));
             process.WriteBytes(view, BitConverter.GetBytes(999L)); hud(view);
             check(process.ReadValue<float>(lowList + 0x18) == 0.6f, "Other HUD classes remain untouched by the tint bridge");
+            process.WriteBytes(view, BitConverter.GetBytes(123L));
+            Ptr(swf + 0x4D0, IntPtr.Zero); Ptr(swf + 0x18, root);
+            process.WriteBytes(memory + 0x100, LowHealthTintCode.CreateHudControl(state.ToInt64(), 123, (memory + 0x3000).ToInt64(), 0x18));
+            hud(view);
+            check(process.ReadValue<float>(lowList + 0x18) == 0 && process.ReadValue<float>(lowList + 0x28) == 0, "Modern SWF root offset is used instead of the legacy root pointer");
+
+            IntPtr modernLayer = view + 0x3120, registerReport = memory + 0xE000;
+            process.WriteBytes(memory + 0x100, LowHealthTintCode.CreateIndexedVignette(state.ToInt64(), (memory + 0x100).ToInt64(), (memory + 0x3000).ToInt64(), 0x2E98, 0x8C0));
+            var modernCall = new List<byte>(Convert.FromHexString("5657415641574883EC28488BF1488BFA4D8BF041BF0300000048B8"));
+            modernCall.AddRange(BitConverter.GetBytes((memory + 0x100).ToInt64()));
+            modernCall.AddRange(Convert.FromHexString("FFD048B8")); modernCall.AddRange(BitConverter.GetBytes(registerReport.ToInt64()));
+            modernCall.AddRange(Convert.FromHexString("4889384C8970084C8978104883C428415F415E5F5EC3"));
+            process.WriteBytes(memory, modernCall.ToArray());
+            var modernVignette = Marshal.GetDelegateForFunctionPointer<Vignette>(memory);
+            process.WriteBytes(state + 232, BitConverter.GetBytes(123L));
+            process.WriteBytes(state + 240, BitConverter.GetBytes(1)); process.WriteBytes(state + 244, BitConverter.GetBytes(2));
+            process.WriteBytes(view + 0x2E98, BitConverter.GetBytes(123L)); process.WriteBytes(view + 0x2EA0, BitConverter.GetBytes(2));
+            process.WriteBytes(modernLayer, BitConverter.GetBytes(0));
+            foreach(float scale in new[] { 0f, 0.5f, 1f }) {
+                process.WriteBytes(state + LowHealthTintCode.ScaleOffset, BitConverter.GetBytes(scale));
+                process.WriteBytes(output + 0x8C0 + 12, BitConverter.GetBytes(0.8f));
+                float bookkeeping = modernVignette(view, modernLayer + 0x3C, output);
+                check(process.ReadValue<float>(output + 0x8C0 + 12) == 0.8f * scale && bookkeeping == 0.8f, $"Modern indexed output scales at {scale} and preserves game bookkeeping");
+                check(process.ReadPointer(registerReport) == modernLayer + 0x3C && process.ReadPointer(registerReport + 8) == output && process.ReadValue<long>(registerReport + 16) == 3, "Indexed bridge restores layer, output base, and output index registers");
+            }
+            process.WriteBytes(state + LowHealthTintCode.LeaseOffset, new byte[4]);
+            process.WriteBytes(output + 0x8C0 + 12, BitConverter.GetBytes(0.8f));
+            modernVignette(view, modernLayer + 0x3C, output);
+            check(process.ReadValue<float>(output + 0x8C0 + 12) == 0.8f, "Expired lease leaves modern screen FX unmodified");
         } finally { process.FreeMemory(memory); }
     }
 }

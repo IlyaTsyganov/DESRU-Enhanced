@@ -211,7 +211,7 @@ Source defaults leave current speed disabled until show1, while landing is selec
 
 `InitializeIndependentPositions` performs a one-time version 0→1 migration. If both old positions match, landing X is shifted by ceil(160×currentScale), capped at Int32.MaxValue. Different positions are preserved. After version 1, intentionally matching coordinates are allowed. Percentage coordinates from the earliest test builds are not automatically converted; they must be entered again in pixels. The user has already done this.
 
-## 8. Exact DESRUS06 shared-memory layout
+## 8. Shared-memory layout (extended by DESRUS07 in section 14)
 
 All offsets are relative to state. Values prefixed with `0x` are hexadecimal; other offsets are decimal.
 
@@ -377,3 +377,35 @@ Investigation used the local executable's type tables and meath00k reference sou
 ## Publication notes
 
 The public fork disables upstream automatic update checks by default (`EnableUpstreamUpdates=False`) so an upstream update cannot replace these enhancements. Download fork releases manually. The release is an update archive for an existing official DESRU 1.6.17 installation; it does not redistribute game fonts, meath00k, or the freescroll executable. Source builds use the original project dependencies. Local paths, user profiles, logs, private continuation context, and PDBs are excluded.
+
+## 14. Console command queries (DESRUS07)
+
+All seven commands accept no arguments as a read-only query. They print exactly two lines:
+
+```text
+"desru_speedometer_size" is:"4" default:"1"
+Set text size (0.1 to 10). Always applies to both speedometers.
+```
+
+The example assumes the source distribution default size of 1. A prepared installation whose configuration sets size 2 correctly reports default:"2". Unequal per-reading values are shown together, for example `is:"current=400 landing=800"`; equal values are collapsed into one. RGB uses three integers. Querying never changes or saves preferences.
+
+`Overlay/SpeedometerCommandHelp.cs` formats current settings, reads application defaults from `typeof(Settings).Assembly.Location + ".config"` through an independent OpenMappedExeConfiguration, and provides English descriptions. Reading the Settings provider's shared cached section could accidentally report a saved color as its default; the independent on-disk configuration prevents this. Tests cover defaults both immediately after saving and after restarting the test process.
+
+`ReadCommands` now accepts argc=1. MainWindow and the diagnostic helper route an empty argument array to help instead of Apply/Save. A bounded host queue of 32 responses publishes one response at a time, with text first and a ready flag last. The game HUD prints it and clears the flag afterward. The response uses state+416 for ready, +420 for constant `%s`, and +432 for a 576-byte NUL-terminated ASCII buffer, ending at +1008 before the command mailboxes. A message must fit completely; oversized messages are rejected.
+
+The verified game print function is idLib::VPrintf at RVA `0x328C60`, entry signature `405556415441564157488DAC24207FFFFFB8E0810000`. The native adapter calls it on the game's HUD thread with channel=1, severity=1, format="%s", and a Windows x64 va_list containing the text pointer. It preserves the original HUD and prints even when meter visibility/lease is zero. Literal percent characters in messages are not interpreted as format strings. Native execution tests verify the ABI, one-time acknowledgement, and hidden-meter behavior.
+
+The magic is now DESRUS07; DESRUS06 is accepted for migration, with the response region initialized before publishing the new renderer. Existing callbacks and command names are retained. Game hooks for low-health tint and speed calculations are unchanged. Final tests: 143 checks in the publication checkout (142 in the original worktree), plus 7 restart checks and the post-save default check. Earlier result counts in the report describe earlier snapshots.
+
+
+## 15. Adaptive native integration and Steam validation (October 18, 2026)
+
+Native rendering, console registration, console printing, glyph metrics and ground contact are now resolved from the installed executable by `Overlay/NativeGameLayout.cs`. PE sections, MSVC RTTI, unique instruction signatures and reflected game type metadata replace the previous 1.1-only native address selection. `NativeTintLayout.cs` records the resolved low-health layout. Runtime module size and original code bytes are checked before installation; unresolved or ambiguous layouts are rejected rather than patched with guessed addresses. Existing supported game memory roots remain managed by DESRU's version table. This is adaptive compatibility, not a guarantee for every past or future executable.
+
+`MemoryHandler.cs` supplies the resolved contact offset and current player address. `MainWindow.Overlays.cs` forwards that address to the native adapter. `LowHealthTintTarget.cs` resolves the active screen-FX declaration, action list and low-health conditions using the layout metadata. Both identified low-health layers remain independently filtered: the player screen effect and HUD `_root/lowHealth/backgroundFx`.
+
+`LowHealthTintCode.cs` adds the modern indexed vignette bridge. The Steam layout reads alpha through R14 + R15*4 + 0x8C0; the bridge preserves RDI/R14/R15 and the original XMM0 used by game bookkeeping while scaling only the selected output alpha. HUD SWF root is 0x18 on the tested Steam executable, versus 0x4D0 on 1.1. Buffer, enum, action-list and player-field offsets are resolved rather than shared blindly between builds. Hook ownership markers are DESRUV05 and DESRUH03; the shared renderer remains DESRUS07. Exact ownership checks, instruction-boundary patching, rollback and expiry restoration are retained.
+
+Read-only resolution succeeded on installed 1.0, 1.1 and Steam 6.66 Rev 3.2 executables. Live native speedometers and console commands were confirmed by the user on 1.1 and Steam 6.66 Rev 3.2. The user also confirmed that low-health opacity 0/50/100 works on the current Steam build after transfer of both layers. Version 1.0 has resolution coverage only, not a live visual confirmation. No game executable on disk was modified.
+
+Validation: 151 publication checks (150 in the original worktree, which lacks the fork updater-policy check), plus seven separate-process persistence checks. Native execution coverage includes the modern indexed alpha path at 0, 0.5 and 1, nonzero array index, preserved registers and original XMM0, expired lease restoration, and the modern HUD root. Full regression of every upstream feature and every game version is not claimed.

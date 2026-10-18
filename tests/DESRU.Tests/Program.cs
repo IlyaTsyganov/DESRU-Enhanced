@@ -14,6 +14,10 @@ internal static class Program {
     [STAThread]
     private static int Main(string[] args) {
         try {
+            if(args.Length == 2 && args[0] == "--resolve-game") {
+                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(NativeGameLayout.Resolve(args[1])));
+                return 0;
+            }
             if(args.Contains("--inspect-lowhp") || args.Contains("--trace-lowhp")) {
                 using var game = Process.GetProcessesByName("DOOMEternalx64vk").First(p => p.MainModule!.ModuleMemorySize == NativeSpeedometer.ModuleSize11);
                 IntPtr image = game.MainModule!.BaseAddress;
@@ -70,6 +74,7 @@ internal static class Program {
                 s.CurrentSpeedOverlayScale = 1.25; s.LandingSpeedOverlayScale = 1.75;
                 s.ShowSpeedometer = true;
                 s.Save();
+                Check(SpeedometerCommandHelp.Format(s, 6).Contains("default:\"255 255 255\""), "Saving colors cannot mutate the default shown in help");
                 Console.WriteLine("Saved settings in the separate test executable's profile.");
                 return 0;
             }
@@ -81,6 +86,7 @@ internal static class Program {
                 Check(s.LowHpTintOpacity == 37.5, "Low-health tint opacity survives restart");
                 Check(!s.SpeedometersEnabled && s.CurrentSpeedOverlayColor.ToArgb() == Color.FromArgb(12, 34, 56).ToArgb() && s.LandingSpeedOverlayColor.ToArgb() == Color.FromArgb(255, 128, 0).ToArgb(), "Master visibility and distinct RGB colors survive restart");
                 Check(s.CurrentSpeedOverlayScale == 1.25 && s.LandingSpeedOverlayScale == 1.75, "Independent sizes survive restart");
+                Check(SpeedometerCommandHelp.Format(s, 6).Contains("is:\"current=12 34 56 landing=255 128 0\" default:\"255 255 255\""), "Help separates saved profile colors from immutable application defaults after restart");
                 s.Reset();
                 Console.WriteLine($"PASS: {_checks} restart persistence checks");
                 return 0;
@@ -146,6 +152,18 @@ internal static class Program {
             var output = Path.GetFullPath(args.FirstOrDefault() ?? "artifacts/test-previews");
             Directory.CreateDirectory(output);
             var commandSettings = new Settings();
+            commandSettings.CurrentSpeedOverlayScale = commandSettings.LandingSpeedOverlayScale = 4;
+            string sizeHelp = SpeedometerCommandHelp.Format(commandSettings, 3);
+            Check(sizeHelp == "\"desru_speedometer_size\" is:\"4\" default:\"1\"\nSet text size (0.1 to 10). Always applies to both speedometers.\n", "Bare-command help has the requested two-line format and source defaults instead of saved values");
+            commandSettings.CurrentSpeedOverlayX = 400; commandSettings.LandingSpeedOverlayX = 800;
+            Check(SpeedometerCommandHelp.Format(commandSettings, 1).Contains("is:\"current=400 landing=800\""), "Independent coordinates are reported without losing either value");
+            commandSettings.CurrentSpeedOverlayColor = Color.Red; commandSettings.LandingSpeedOverlayColor = Color.Lime;
+            Check(SpeedometerCommandHelp.Format(commandSettings, 6).Contains("is:\"current=255 0 0 landing=0 255 0\" default:\"255 255 255\""), "Help reports both RGB colors and the white default");
+            commandSettings.SpeedometersEnabled = false; commandSettings.LandingSpeedOverlayEnabled = true;
+            Check(SpeedometerCommandHelp.Format(commandSettings, 0).Contains("is:\"0\" default:\"1\"") && SpeedometerCommandHelp.Format(commandSettings, 5).Contains("is:\"1\" default:\"1\""), "Master and landing help describe independent stored flags");
+            Check(Enumerable.Range(0, 7).All(i => SpeedometerCommandHelp.Format(commandSettings, i).Split('\n').Length == 3 && System.Text.Encoding.ASCII.GetByteCount(SpeedometerCommandHelp.Format(commandSettings, i)) < NativeSpeedometerCode.ConsoleTextCapacity), "All seven help responses contain two lines and fit the bounded buffer");
+            Check(commandSettings.CurrentSpeedOverlayScale == 4 && !commandSettings.SpeedometersEnabled && commandSettings.CurrentSpeedOverlayX == 400, "Help does not modify settings");
+            commandSettings = new Settings();
             commandSettings.CurrentSpeedOverlayX = 3; commandSettings.CurrentSpeedOverlayY = 70;
             commandSettings.LandingSpeedOverlayX = 3; commandSettings.LandingSpeedOverlayY = 77;
             Check(SpeedometerCommands.Apply(commandSettings, 0, "0", "") && !commandSettings.SpeedometersEnabled, "Master show command hides both without changing the landing preference");
@@ -336,6 +354,10 @@ internal static class Program {
                 if(tracker.Current.HasValue) maxSpeed = Math.Max(maxSpeed, tracker.Current.Value);
                 if(native != null) {
                     foreach(var command in native.ReadCommands()) {
+                        if(command.Arguments.Length == 0) {
+                            native.QueueConsoleMessage(SpeedometerCommandHelp.Format(settings, command.Command));
+                            continue;
+                        }
                         bool applied = SpeedometerCommands.Apply(settings, command.Command, command.Arguments);
                         consoleCommands.Add(new { command.Command, command.Arguments, applied });
                         if(applied) settings.Save();

@@ -32,6 +32,7 @@ namespace DESpeedrunUtil {
             if(_nativeSpeedometer == null && !_nativeAttachFailed) {
                 try {
                     _nativeSpeedometer = NativeSpeedometer.Attach(GameProcess);
+                    Memory.SetGroundContactOffset(_nativeSpeedometer.GroundPlaneFromVelocity);
                     Log.Information("Native speedometers and console commands attached");
                 } catch(Exception e) {
                     _nativeAttachFailed = true;
@@ -42,6 +43,10 @@ namespace DESpeedrunUtil {
                 try {
                     bool changed = false;
                     foreach(var command in _nativeSpeedometer.ReadCommands()) {
+                        if(command.Arguments.Length == 0) {
+                            _nativeSpeedometer.QueueConsoleMessage(SpeedometerCommandHelp.Format(settings, command.Command));
+                            continue;
+                        }
                         bool applied = SpeedometerCommands.Apply(settings, command.Command, command.Arguments);
                         changed |= applied;
                         if(!applied) Log.Warning("Invalid DESRU console command {Command}: {Arguments}", command.Command, string.Join(" ", command.Arguments));
@@ -52,7 +57,7 @@ namespace DESpeedrunUtil {
                         new SpeedometerReading(show && settings.CurrentSpeedOverlayEnabled, settings.CurrentSpeedOverlayX, settings.CurrentSpeedOverlayY,
                             speed.Current, true, settings.CurrentSpeedOverlayScale, settings.CurrentSpeedOverlayColor),
                         new SpeedometerReading(show && settings.LandingSpeedOverlayEnabled, settings.LandingSpeedOverlayX, settings.LandingSpeedOverlayY,
-                            speed.LastLanding, Memory.GroundContactSupported, settings.LandingSpeedOverlayScale, settings.LandingSpeedOverlayColor), settings.LowHpTintOpacity);
+                            speed.LastLanding, Memory.GroundContactSupported, settings.LandingSpeedOverlayScale, settings.LandingSpeedOverlayColor), settings.LowHpTintOpacity, Memory.ReadPlayerAddress());
                 } catch(Exception e) {
                     Log.Warning(e, "Native speedometer update stopped; the original HUD remains active");
                     _nativeSpeedometer.Dispose();
