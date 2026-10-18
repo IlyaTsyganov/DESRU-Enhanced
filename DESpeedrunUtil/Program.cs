@@ -1,4 +1,4 @@
-using DESpeedrunUtil.Memory;
+﻿using DESpeedrunUtil.Memory;
 using Linearstar.Windows.RawInput;
 using Newtonsoft.Json;
 using Serilog;
@@ -180,6 +180,8 @@ namespace DESpeedrunUtil {
         }
 
         private static bool UpdateCheck() {
+            // Fork releases are installed manually; do not replace enhancements with upstream binaries.
+            if(!bool.TryParse(System.Configuration.ConfigurationManager.AppSettings["EnableUpstreamUpdates"], out bool enabled) || !enabled) return false;
             string json;
             try {
                 using WebClient client = new();

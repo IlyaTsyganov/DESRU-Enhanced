@@ -51,6 +51,8 @@
             public int ResScales { get; init; }
 
             public int Velocity { get; init; }
+            // Verified playerPState_t.groundPlane offset relative to velocity; 0 = unknown.
+            public int GroundPlaneFromVelocity { get; init; }
             public int Position { get; init; }
             public int Rotation { get; init; }
 
@@ -85,6 +87,7 @@
                 DropMS = 0;
                 ResScales = res;
                 Velocity = 0;
+                GroundPlaneFromVelocity = 0;
                 Position = 0;
                 Rotation = 0;
                 ForceRes = 0;

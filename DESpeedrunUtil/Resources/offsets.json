@@ -607,6 +607,7 @@
     "DropMS": 96353812,
     "ResScales": 40347328,
     "Velocity": 80143112,
+    "GroundPlaneFromVelocity": 136,
     "Position": 100048976,
     "Rotation": 102364280,
     "ForceRes": 96353300,

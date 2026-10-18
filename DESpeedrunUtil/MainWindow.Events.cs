@@ -516,6 +516,7 @@ namespace DESpeedrunUtil {
             _speedometer = new Speedometer(EternalUIRegular32, EternalUIRegular20, speedometerPanel.Location, speedometerPanel.Size, COLOR_TEXT_FORE, COLOR_PANEL_BACK);
             _speedometer.Visible = false;
             trainerPanel.Controls.Add(_speedometer);
+            InitializeSpeedOverlays();
             var titleBar = new DESRUShadowLabel(windowTitle.Font, WINDOW_TITLE, windowTitle.Location, Color.FromArgb(190, 34, 34), COLOR_FORM_BACK);
             titleBar.MouseMove += new MouseEventHandler(DragWindow_MouseMove);
             titleBar.MouseUp += new MouseEventHandler(DragWindow_MouseUp);
@@ -616,6 +617,8 @@ namespace DESpeedrunUtil {
 
         // Event method that runs upon closing of the <c>MainWindow</c> form.
         private void MainWindow_Closing(object sender, FormClosingEventArgs e) {
+            ReleaseSpeedOverlays();
+            _speedOverlay?.Dispose();
             _formTimer.Stop();
             _statusTimer.Stop();
             _settingsTimer.Stop();

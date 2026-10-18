@@ -43,6 +43,9 @@ namespace DESpeedrunUtil.Memory {
         public Timer MemoryTimer { get; init; }
         public bool Reset { get; init; }
         public bool TrainerSupported { get; private set; } = true;
+        private HorizontalSpeedSampler? _speedSampler;
+        public HorizontalSpeedSnapshot HorizontalSpeed => _speedSampler?.Snapshot ?? HorizontalSpeedSnapshot.Empty;
+        public bool GroundContactSupported => _currentOffsets.GroundPlaneFromVelocity > 0;
         public bool FirstRun { get; set; } = true;
         public bool EnableOSD { get; set; } = false;
         public bool EnableCheats { get; set; } = false;
@@ -110,6 +113,7 @@ namespace DESpeedrunUtil.Memory {
 
             TrainerSupported = CheckNonZeroPtr(_positionPtr);
             if(TrainerSupported) ReadTrainerValues();
+            ReadHorizontalSpeed();
 
             if(CheckNonZeroPtr(_cheatsConsolePtr) && _game.ReadValue<bool>(_cheatsConsolePtr) != !EnableCheats) {
                 //_game.VirtualProtect(_cheatsConsolePtr, 128, MemPageProtect.PAGE_READWRITE);
@@ -449,6 +453,14 @@ namespace DESpeedrunUtil.Memory {
 
             Log.Information("-- Reset Run Script Completed --");
         }
+
+        private void ReadHorizontalSpeed() {
+            bool enabled = Properties.Settings.Default.SpeedometersEnabled && (Properties.Settings.Default.CurrentSpeedOverlayEnabled || Properties.Settings.Default.LandingSpeedOverlayEnabled);
+            if(enabled) _speedSampler ??= new HorizontalSpeedSampler(_game);
+            _speedSampler?.SetContext(_velocityPtr, _currentOffsets.GroundPlaneFromVelocity, enabled && !IsLoadingOrInMenu());
+        }
+
+        internal void StopSpeedSampler() { _speedSampler?.Dispose(); _speedSampler = null; }
 
         private void ReadTrainerValues() {
             _velocityX = _game.ReadValue<float>(_velocityPtr);
@@ -883,7 +895,7 @@ namespace DESpeedrunUtil.Memory {
                 _forceResDP?.DerefOffsets(_game, out _forceResPtr);
                 _currentResScaleDP?.DerefOffsets(_game, out _currentResScalePtr);
 
-                _velocityDP?.DerefOffsets(_game, out _velocityPtr);
+                if(_velocityDP == null || !_velocityDP.DerefOffsets(_game, out _velocityPtr)) _velocityPtr = IntPtr.Zero;
                 _positionDP?.DerefOffsets(_game, out _positionPtr);
                 _rotationDP?.DerefOffsets(_game, out _rotationPtr);
 

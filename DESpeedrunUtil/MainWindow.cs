@@ -297,6 +297,7 @@ namespace DESpeedrunUtil {
             }
 
             /** Trainer **/
+            UpdateSpeedOverlays();
             var (velX, velY, velZ, hVel, totalVel) = Memory.GetPlayerVelocity();
             bool showDuringLoads = !Memory.IsLoadingOrInMenu() || !hideDuringLoadsCheckbox.Checked;
             if(Memory.GetFlag("meath00k") || Memory.EnableCheats) {
@@ -1108,6 +1109,7 @@ namespace DESpeedrunUtil {
         private void LaunchRTSS() => Process.Start(new ProcessStartInfo(_rtssExecutable) { WorkingDirectory = _rtssExecutable[.._rtssExecutable.LastIndexOf('\\')] });
 
         private void DisposeGameProcess() {
+            ReleaseSpeedOverlays();
             Hooked = false;
             HotkeyHandler.Instance.DisableHotkeys();
             GameProcess?.Dispose();

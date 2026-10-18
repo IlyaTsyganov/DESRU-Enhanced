@@ -1,4 +1,4 @@
-﻿<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='utf-8'?>
 <SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="DESpeedrunUtil.Properties" GeneratedClassName="Settings">
   <Profiles />
   <Settings>
@@ -142,6 +142,45 @@
     </Setting>
     <Setting Name="DevConsoleKey" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">192</Value>
+    </Setting>
+    <Setting Name="CurrentSpeedOverlayEnabled" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="LandingSpeedOverlayEnabled" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="CurrentSpeedOverlayX" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">40</Value>
+    </Setting>
+    <Setting Name="CurrentSpeedOverlayY" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">600</Value>
+    </Setting>
+    <Setting Name="LandingSpeedOverlayX" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">200</Value>
+    </Setting>
+    <Setting Name="LandingSpeedOverlayY" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">600</Value>
+    </Setting>
+    <Setting Name="CurrentSpeedOverlayScale" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">1</Value>
+    </Setting>
+    <Setting Name="LandingSpeedOverlayScale" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">1</Value>
+    </Setting>
+    <Setting Name="SpeedometerPositionsVersion" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="LowHpTintOpacity" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">100</Value>
+    </Setting>
+    <Setting Name="SpeedometersEnabled" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="CurrentSpeedOverlayColor" Type="System.Drawing.Color" Scope="User">
+      <Value Profile="(Default)">White</Value>
+    </Setting>
+    <Setting Name="LandingSpeedOverlayColor" Type="System.Drawing.Color" Scope="User">
+      <Value Profile="(Default)">White</Value>
     </Setting>
   </Settings>
 </SettingsFile>
