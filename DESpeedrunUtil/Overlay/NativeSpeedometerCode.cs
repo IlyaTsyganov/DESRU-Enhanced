@@ -7,7 +7,8 @@ namespace DESpeedrunUtil.Overlay {
             "desru_speedometer_showlanding", "desru_speedometer_color"
         };
         internal const int StateSize = 4096, CallbackStart = 0x500, CallbackStride = 0x100;
-        internal const string Magic = "DESRUS06";
+        internal const string Magic = "DESRUS07";
+        internal const int ConsoleReadyOffset = 416, ConsoleFormatOffset = 420, ConsoleTextOffset = 432, ConsoleTextCapacity = 576;
 
         internal sealed class Code {
             internal readonly List<byte> Bytes = new();
@@ -27,7 +28,7 @@ namespace DESpeedrunUtil.Overlay {
             }
         }
 
-        internal static byte[] Render(long codeAddress, long state, long original, long draw, long width, long height, long commandSystem, long addCommand) {
+        internal static byte[] Render(long codeAddress, long state, long original, long draw, long width, long height, long commandSystem, long addCommand, long print = 0) {
             var c = new Code();
             // Entry RSP % 16 == 8. Three saved registers + 64 bytes give aligned call sites.
             c.Emit("535657 4883EC40 488BF2 48BB"); c.Pointer(state);
@@ -51,6 +52,15 @@ namespace DESpeedrunUtil.Overlay {
             }
             c.Emit("C7430403000000");
             c.Label("registered");
+            if(print != 0) {
+                // Print on the game's own HUD thread even while the meters are hidden.
+                // VPrintf(channel=1, severity=1, "%s", va_list{message}); never use user text as a format.
+                c.Emit("83BBA001000000"); c.Jump("0F8E", "consoleDone");
+                c.Emit("488D83B0010000 4889442430 B901000000 BA01000000 4C8D83A4010000 4C8D4C2430");
+                c.Call(print);
+                c.Emit("C783A001000000000000");
+                c.Label("consoleDone");
+            }
             c.Emit("833B00"); c.Jump("0F84", "done");
             c.Emit("F0FF0B 488BCE"); c.Call(width); c.Emit("F30F11442438");
             c.Emit("488BCE"); c.Call(height); c.Emit("F30F1144243C");

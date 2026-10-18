@@ -9,19 +9,23 @@ namespace DESpeedrunUtil.Overlay {
         private readonly Process _game;
         private readonly IntPtr _state;
         private readonly int[] _sequences = new int[NativeSpeedometerCode.Commands.Length];
+        private readonly Queue<string> _consoleMessages = new();
         private bool _tintAttached, _tintAttachFailed;
         private readonly LowHealthTintTarget _tintTarget;
+        private readonly NativeGameLayout _layout;
+        internal int GroundPlaneFromVelocity => _layout.GroundPlaneFromVelocity;
         internal bool TintAttached => _tintAttached;
         private readonly float _glyphWidth, _glyphHeight;
         internal const int ModuleSize11 = 492113920;
         internal bool CommandsRegistered => _game.ReadValue<int>(_state + 4) == 3;
         internal long RenderCount => _game.ReadValue<long>(_state + 8);
 
-        private NativeSpeedometer(Process game, IntPtr state) {
+        private NativeSpeedometer(Process game, IntPtr state, NativeGameLayout layout) {
             _game = game; _state = state;
+            _layout = layout;
             _tintTarget = new LowHealthTintTarget(game);
-            _glyphWidth = game.ReadValue<float>(game.MainModule!.BaseAddress + 0x4F68560);
-            _glyphHeight = game.ReadValue<float>(game.MainModule.BaseAddress + 0x4F68564);
+            _glyphWidth = game.ReadValue<float>(game.MainModule!.BaseAddress + layout.GlyphWidth);
+            _glyphHeight = game.ReadValue<float>(game.MainModule.BaseAddress + layout.GlyphHeight);
             if(!float.IsFinite(_glyphWidth) || _glyphWidth <= 0 || _glyphWidth > 1000 ||
                 !float.IsFinite(_glyphHeight) || _glyphHeight <= 0 || _glyphHeight > 1000)
                 throw new InvalidOperationException("Cannot read game font metrics");
@@ -30,11 +34,12 @@ namespace DESpeedrunUtil.Overlay {
         }
 
         internal static NativeSpeedometer Attach(Process game) {
-            if(game.MainModule!.ModuleMemorySize != ModuleSize11) throw new NotSupportedException("Native speedometers currently support DOOM Eternal 1.1");
-            IntPtr image = game.MainModule.BaseAddress, slot = image + 0x2608800;
+            var layout = NativeGameLayout.Resolve(game.MainModule!.FileName);
+            if(game.MainModule.ModuleMemorySize != layout.ImageSize) throw new NotSupportedException("On-disk and loaded game images differ");
+            IntPtr image = game.MainModule.BaseAddress, slot = image + layout.HudSlot;
             if(!game.ReadPointer(slot, true, out var original)) throw new InvalidOperationException("Cannot read HUD renderer");
             IntPtr previousState = IntPtr.Zero;
-            if(original != image + 0x44BE70) {
+            if(original != image + layout.Render) {
                 // Reconnect after DESRU restarted. Code/data remain alive for the lifetime of the game.
                 var existing = game.ReadBytes(original, 20);
                 if(existing != null && existing.AsSpan(0, 12).SequenceEqual(Convert.FromHexString("5356574883EC40488BF248BB"))) {
@@ -43,19 +48,16 @@ namespace DESpeedrunUtil.Overlay {
                     if(magic == NativeSpeedometerCode.Magic) {
                         byte[] descriptions = CreateState();
                         for(int i = 0; i < NativeSpeedometerCode.Commands.Length; i++) game.WriteBytes(state + 0x800 + i * 0x100, descriptions.AsSpan(0x800 + i * 0x100, 256).ToArray());
-                        return new NativeSpeedometer(game, state);
+                        return new NativeSpeedometer(game, state, layout);
                     }
                     // Upgrade earlier coordinate adapters without freeing their registered
                     // command callbacks. Reuse their mailboxes; replace only the aligned render slot.
-                    if(magic == "DESRUS02" || magic == "DESRUS03" || magic == "DESRUS04" || magic == "DESRUS05") previousState = state;
+                    if(magic == "DESRUS02" || magic == "DESRUS03" || magic == "DESRUS04" || magic == "DESRUS05" || magic == "DESRUS06") previousState = state;
                 }
                 if(previousState == IntPtr.Zero) throw new NotSupportedException("Another HUD renderer hook is installed; it was left unchanged");
             }
-            Verify(game, image + 0x44BE70, "4055574881ECC8000000");
-            Verify(game, image + 0x5A5B90, "48895C24104889742418574883EC70");
-            Verify(game, image + 0x5A6090, "F68148450000017411");
-            Verify(game, image + 0x5A6060, "F68148450000017411");
-            if(!game.ReadPointer(image + 0x3BDF8A8, true, out var commandSystem) || commandSystem == IntPtr.Zero ||
+            foreach(int code in new[] { layout.Render, layout.Draw, layout.Width, layout.Height, layout.Print }) VerifyFileCode(game, code);
+            if(!game.ReadPointer(image + layout.CommandGlobal, true, out var commandSystem) || commandSystem == IntPtr.Zero ||
                 !game.ReadPointer(commandSystem, true, out var commandVtable) ||
                 !game.ReadPointer(commandVtable + 24, true, out var addCommand) || addCommand == IntPtr.Zero)
                 throw new InvalidOperationException("Cannot resolve the game command system");
@@ -66,8 +68,8 @@ namespace DESpeedrunUtil.Overlay {
                 IntPtr state = previousState != IntPtr.Zero ? previousState : allocation + 4096;
                 byte[] data = CreateState();
                 if(previousState == IntPtr.Zero && !game.WriteBytes(state, data)) throw new InvalidOperationException("Cannot initialize HUD state");
-                byte[] code = NativeSpeedometerCode.Render(allocation.ToInt64(), state.ToInt64(), (image + 0x44BE70).ToInt64(),
-                    (image + 0x5A5B90).ToInt64(), (image + 0x5A6090).ToInt64(), (image + 0x5A6060).ToInt64(), commandSystem.ToInt64(), addCommand.ToInt64());
+                byte[] code = NativeSpeedometerCode.Render(allocation.ToInt64(), state.ToInt64(), (image + layout.Render).ToInt64(),
+                    (image + layout.Draw).ToInt64(), (image + layout.Width).ToInt64(), (image + layout.Height).ToInt64(), commandSystem.ToInt64(), addCommand.ToInt64(), (image + layout.Print).ToInt64());
                 if(!game.WriteBytes(allocation, code)) throw new InvalidOperationException("Cannot write the HUD adapter");
                 for(int i = 0; i < NativeSpeedometerCode.Commands.Length; i++)
                     if(!game.WriteBytes(allocation + NativeSpeedometerCode.CallbackStart + i * NativeSpeedometerCode.CallbackStride,
@@ -81,6 +83,8 @@ namespace DESpeedrunUtil.Overlay {
                     game.WriteBytes(state, new byte[4]);
                     game.WriteBytes(state + 56, data.AsSpan(56, 8).ToArray());
                     game.WriteBytes(state + 384, data.AsSpan(384, 32).ToArray());
+                    if(!game.WriteBytes(state + NativeSpeedometerCode.ConsoleReadyOffset, data.AsSpan(NativeSpeedometerCode.ConsoleReadyOffset, 592).ToArray()))
+                        throw new InvalidOperationException("Cannot initialize console response buffer");
                     // New registration may run on the next game frame immediately after the slot
                     // write. Publish the fifth name/help before exposing the new renderer.
                     for(int i = 0; i < NativeSpeedometerCode.Commands.Length; i++)
@@ -94,7 +98,7 @@ namespace DESpeedrunUtil.Overlay {
                 if(previousState != IntPtr.Zero) {
                     game.WriteBytes(state + 48, Encoding.ASCII.GetBytes(NativeSpeedometerCode.Magic));
                 }
-                return new NativeSpeedometer(game, state);
+                return new NativeSpeedometer(game, state, layout);
             } finally {
                 if(!installed) game.FreeMemory(allocation);
             }
@@ -110,6 +114,7 @@ namespace DESpeedrunUtil.Overlay {
             for(int i = 0; i < 4; i++) BitConverter.GetBytes(1f).CopyTo(data, 32 + i * 4);
             for(int i = 0; i < 8; i++) BitConverter.GetBytes(1f).CopyTo(data, 384 + i * 4);
             Encoding.ASCII.GetBytes(NativeSpeedometerCode.Magic).CopyTo(data, 48);
+            Encoding.ASCII.GetBytes("%s\0").CopyTo(data, NativeSpeedometerCode.ConsoleFormatOffset);
             for(int i = 0; i < NativeSpeedometerCode.Commands.Length; i++) {
                 Encoding.ASCII.GetBytes(NativeSpeedometerCode.Commands[i]).CopyTo(data, 0x800 + i * 0x100);
                 string help = i == 4 ? "<0..100>: low-health red tint opacity; 100 restores original opacity" :
@@ -122,13 +127,19 @@ namespace DESpeedrunUtil.Overlay {
             return data;
         }
 
-        private static void Verify(Process game, IntPtr address, string signature) {
-            var expected = Convert.FromHexString(signature);
-            if(!(game.ReadBytes(address, expected.Length) ?? Array.Empty<byte>()).SequenceEqual(expected))
-                throw new NotSupportedException("Game renderer signature does not match the verified 1.1 build");
+        private static void VerifyFileCode(Process game, int rva) {
+            using var file = File.OpenRead(game.MainModule!.FileName);
+            using var pe = new System.Reflection.PortableExecutable.PEReader(file, System.Reflection.PortableExecutable.PEStreamOptions.LeaveOpen);
+            var section = pe.PEHeaders.SectionHeaders.Single(s => rva >= s.VirtualAddress && rva + 16 <= s.VirtualAddress + s.SizeOfRawData);
+            file.Position = rva - section.VirtualAddress + section.PointerToRawData;
+            var expected = new byte[16];
+            if(file.Read(expected, 0, expected.Length) != expected.Length ||
+                !(game.ReadBytes(game.MainModule.BaseAddress + rva, expected.Length) ?? Array.Empty<byte>()).SequenceEqual(expected))
+                throw new NotSupportedException("Game code differs from the resolved executable; another hook was left unchanged");
         }
 
-        internal void Update(SpeedometerReading current, SpeedometerReading landing, double lowHpTintOpacity = 100) {
+        internal void Update(SpeedometerReading current, SpeedometerReading landing, double lowHpTintOpacity = 100, IntPtr player = default) {
+            FlushConsoleMessage();
             lowHpTintOpacity = double.IsFinite(lowHpTintOpacity) ? Math.Clamp(lowHpTintOpacity, 0, 100) : 100;
             if(lowHpTintOpacity < 100 && !_tintAttached && !_tintAttachFailed) {
                 try {
@@ -142,7 +153,7 @@ namespace DESpeedrunUtil.Overlay {
                 }
             }
             byte[] tint = new byte[8];
-            if(_tintAttached) _tintTarget.Update(_state);
+            if(_tintAttached) _tintTarget.Update(_state, player);
             BitConverter.GetBytes(_tintAttachFailed ? 0 : 240).CopyTo(tint, 0);
             BitConverter.GetBytes((float) (_tintAttachFailed ? 1 : lowHpTintOpacity / 100)).CopyTo(tint, 4);
             byte[] readings = CreateReadings(current, landing, _glyphWidth);
@@ -195,7 +206,7 @@ namespace DESpeedrunUtil.Overlay {
                 if(sequence == _sequences[i] ||
                     !_game.ReadValue<int>(_state + 0x400 + i * 0x80, out var confirmed) || confirmed != sequence) continue;
                 _sequences[i] = sequence;
-                if(argc < 2 || argc > (i == 6 ? 5 : 3)) continue;
+                if(argc < 1 || argc > (i == 6 ? 5 : 3)) continue;
                 yield return (i, Enumerable.Range(0, argc - 1).Select(n => ReadArgument(data, 16 + n * 32)).ToArray());
             }
         }
@@ -203,6 +214,22 @@ namespace DESpeedrunUtil.Overlay {
         private static string ReadArgument(byte[] data, int offset) {
             int end = Array.IndexOf(data, (byte) 0, offset, 32);
             return Encoding.ASCII.GetString(data, offset, end >= offset ? end - offset : 31);
+        }
+
+        internal void QueueConsoleMessage(string message) {
+            if(Encoding.ASCII.GetByteCount(message) >= NativeSpeedometerCode.ConsoleTextCapacity)
+                throw new ArgumentException("Console response exceeds its shared buffer", nameof(message));
+            // A bounded host queue preserves several different help requests until HUD acknowledges them.
+            if(_consoleMessages.Count < 32) _consoleMessages.Enqueue(message);
+        }
+
+        private void FlushConsoleMessage() {
+            if(_consoleMessages.Count == 0 || !_game.ReadValue<int>(_state + NativeSpeedometerCode.ConsoleReadyOffset, out var ready) || ready != 0) return;
+            byte[] text = Encoding.ASCII.GetBytes(_consoleMessages.Peek() + "\0");
+            if(!_game.WriteBytes(_state + NativeSpeedometerCode.ConsoleTextOffset, text) ||
+                !_game.WriteBytes(_state + NativeSpeedometerCode.ConsoleReadyOffset, BitConverter.GetBytes(1)))
+                throw new InvalidOperationException("Cannot publish console response");
+            _consoleMessages.Dequeue();
         }
 
         public void Dispose() {

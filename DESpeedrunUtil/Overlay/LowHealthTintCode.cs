@@ -2,14 +2,14 @@ namespace DESpeedrunUtil.Overlay {
     internal static class LowHealthTintCode {
         internal const int LeaseOffset = 192, ScaleOffset = 196;
 
-        internal static byte[] CreateHudControl(long state, long vtable, long continuation) {
+        internal static byte[] CreateHudControl(long state, long vtable, long continuation, int swfRootOffset = 0x4D0) {
             var c = new NativeSpeedometerCode.Code();
             // No native calls: preserve flags, all touched GP registers, and the whole XMM0.
             c.Emit("9C5051524150415141524153 4883EC10 0F110424 48B8"); c.Pointer(state);
             c.Emit("48FF8028010000 48BA"); c.Pointer(vtable);
             c.Emit("483913"); c.Jump("0F85", "done");
             c.Emit("48899818010000 488B5310 48899020010000 48FF8030010000 4885D2"); c.Jump("0F84", "done");
-            c.Emit("4C8B8AD0040000");
+            c.Emit("4C8B8A"); c.Bytes.AddRange(BitConverter.GetBytes(swfRootOffset));
             // Resolve live display entries on the game's own UI thread. No stale host-side
             // sprite pointer is ever followed after a HUD reload or a timeline change.
             FindChild("lowHealth", "health");
@@ -66,7 +66,7 @@ namespace DESpeedrunUtil.Overlay {
             return b.ToArray();
         }
 
-        internal static byte[] CreateVignette(long state, long continuation, bool preserveBookkeeping = true, bool scaleColor = false) {
+        internal static byte[] CreateVignette(long state, long continuation, bool preserveBookkeeping = true, bool scaleColor = false, int bufferOffset = 0x2DF8) {
             var bytes = new List<byte>();
             var exits = new List<int>();
             void Emit(string hex) => bytes.AddRange(Convert.FromHexString(hex.Replace(" ", "")));
@@ -77,8 +77,8 @@ namespace DESpeedrunUtil.Overlay {
             Exit("0F8E"); // Independent controller heartbeat.
             Emit("486353C4 83FA07"); Exit("0F87"); // Selected vignette index, including -1.
             Emit("486BD250 4803D7"); // RDX = idView + index * sizeof(screenVignette_t).
-            Emit("488B92F82D0000 483B90E8000000"); Exit("0F85"); // Exact screen-FX group handle.
-            Emit("486353C4 486BD250 4803D7 8B92002E0000"); // declActionIdx.
+            Emit("488B92"); bytes.AddRange(BitConverter.GetBytes(bufferOffset)); Emit("483B90E8000000"); Exit("0F85"); // Exact screen-FX group handle.
+            Emit("486353C4 486BD250 4803D7 8B92"); bytes.AddRange(BitConverter.GetBytes(bufferOffset + 8)); // declActionIdx.
             Emit("3B90F0000000 0F84"); int match = bytes.Count; Emit("00000000");
             Emit("3B90F4000000"); Exit("0F85");
             Fix(match, bytes.Count);
@@ -101,6 +101,20 @@ namespace DESpeedrunUtil.Overlay {
             foreach(int offset in exits) Fix(offset, done);
             Emit("5A589D F3410F104610 FF2500000000"); bytes.AddRange(BitConverter.GetBytes(continuation));
             return bytes.ToArray();
+        }
+
+        internal static byte[] CreateIndexedVignette(long state, long address, long continuation, int bufferOffset, int alphaOffset) {
+            // Newer builds use RSI=view, RDI=layer+3C, and an indexed R14/R15 output.
+            // Adapt those registers to the already tested bridge, then restore them before game continuation.
+            var prefix = new List<byte>(Convert.FromHexString("53574156488BDF488BFE4F8DB4BE"));
+            prefix.AddRange(BitConverter.GetBytes(checked(alphaOffset - 0x10)));
+            int length = CreateVignette(state, 0, bufferOffset: bufferOffset).Length;
+            byte[] body = CreateVignette(state, address + prefix.Count + length, bufferOffset: bufferOffset);
+            prefix.AddRange(body);
+            prefix.AddRange(Convert.FromHexString("415E5F5BFF2500000000"));
+            prefix.AddRange(BitConverter.GetBytes(continuation));
+            if(prefix.Count > 0x300) throw new InvalidOperationException("Indexed vignette bridge exceeds its code region");
+            return prefix.ToArray();
         }
 
         // Legacy byte encoders below are retained solely to recognize and remove the owned

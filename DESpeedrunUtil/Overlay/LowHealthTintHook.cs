@@ -5,35 +5,41 @@ using System.Text;
 
 namespace DESpeedrunUtil.Overlay {
     internal static class LowHealthTintHook {
-        private static readonly int[] Sites = { 0x174E365 };
-        private static readonly byte[][] Originals = { Convert.FromHexString("F3410F104610") };
-        private const string Magic = "DESRUV04";
+        private const string Magic = "DESRUV05";
 
         internal static void Attach(Process game, IntPtr state) {
-            if(game.MainModule!.ModuleMemorySize != NativeSpeedometer.ModuleSize11) throw new NotSupportedException("Low-health tint supports the verified 1.1 build only");
+            var layout = NativeGameLayout.Resolve(game.MainModule!.FileName);
+            var profile = layout.Tint ?? throw new NotSupportedException(layout.TintFailure ?? "Cannot resolve low-health layout");
+            int[] Sites = { profile.VignetteHook };
+            byte[] original = profile.IndexedVignette ? Convert.FromHexString("F3430F1084BE").Concat(BitConverter.GetBytes(profile.OutputAlphaOffset)).ToArray() : Convert.FromHexString("F3410F104610");
+            byte[][] Originals = { original };
             IntPtr image = game.MainModule.BaseAddress;
-            LegacyTintCleanup.Restore(game, state);
+            if(game.MainModule!.ModuleMemorySize == NativeSpeedometer.ModuleSize11) LegacyTintCleanup.Restore(game, state);
             var before = Sites.Select((site, i) => game.ReadBytes(image + site, Originals[i].Length) ?? Array.Empty<byte>()).ToArray();
-            if(before[0].SequenceEqual(Originals[0])) { Install(game, image, state, before); return; }
+            if(before[0].SequenceEqual(Originals[0])) { Install(game, image, state, before, profile, Sites, Originals); return; }
             if(before[0].Length != Originals[0].Length || before[0][0] != 0xE9) throw new NotSupportedException("Screen-vignette drawing was changed by another hook");
             IntPtr block = image + Sites[0] + 5 + BitConverter.ToInt32(before[0], 1);
             byte[] marker = game.ReadBytes(block + 0x300, 16) ?? Array.Empty<byte>();
             string oldMagic = marker.Length == 16 ? Encoding.ASCII.GetString(marker, 0, 8) : "";
-            byte[] expected = LowHealthTintCode.CreateVignette(state.ToInt64(), (image + Sites[0] + Originals[0].Length).ToInt64(), oldMagic != "DESRUV01", oldMagic == "DESRUV03");
+            byte[] expected = Bridge(state, block, image + Sites[0] + Originals[0].Length, profile, oldMagic);
             if(!(game.ReadBytes(block, expected.Length) ?? Array.Empty<byte>()).SequenceEqual(expected) || marker.Length != 16 ||
-                (oldMagic != Magic && oldMagic != "DESRUV01" && oldMagic != "DESRUV02" && oldMagic != "DESRUV03") || BitConverter.ToInt64(marker, 8) != state.ToInt64())
+                (oldMagic != Magic && oldMagic != "DESRUV01" && oldMagic != "DESRUV02" && oldMagic != "DESRUV03" && oldMagic != "DESRUV04") || BitConverter.ToInt64(marker, 8) != state.ToInt64())
                 throw new NotSupportedException("Screen-vignette bridge does not match this DESRU session");
-            if(oldMagic != Magic) Install(game, image, state, before);
+            if(oldMagic != Magic) Install(game, image, state, before, profile, Sites, Originals);
         }
 
-        private static void Install(Process game, IntPtr image, IntPtr state, byte[][] before) {
+        private static byte[] Bridge(IntPtr state, IntPtr address, IntPtr continuation, NativeTintLayout profile, string version) =>
+            profile.IndexedVignette ? LowHealthTintCode.CreateIndexedVignette(state.ToInt64(), address.ToInt64(), continuation.ToInt64(), profile.VignetteBufferOffset, profile.OutputAlphaOffset) :
+            LowHealthTintCode.CreateVignette(state.ToInt64(), continuation.ToInt64(), version != "DESRUV01", version == "DESRUV03", profile.VignetteBufferOffset);
+
+        private static void Install(Process game, IntPtr image, IntPtr state, byte[][] before, NativeTintLayout profile, int[] Sites, byte[][] Originals) {
             IntPtr allocation = AllocateNear(game, image + Sites[0]);
             if(allocation == IntPtr.Zero) throw new InvalidOperationException("No free memory within low-health JMP range");
             bool mayBeReferenced = false;
             try {
                 byte[] page = new byte[4096];
                 for(int i = 0; i < Sites.Length; i++) {
-                    byte[] bridge = LowHealthTintCode.CreateVignette(state.ToInt64(), (image + Sites[i] + Originals[i].Length).ToInt64());
+                    byte[] bridge = Bridge(state, allocation + i * 0x100, image + Sites[i] + Originals[i].Length, profile, Magic);
                     bridge.CopyTo(page, i * 0x100);
                 }
                 Encoding.ASCII.GetBytes(Magic).CopyTo(page, 0x300);

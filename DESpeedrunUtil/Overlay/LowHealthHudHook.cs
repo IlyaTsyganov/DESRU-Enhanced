@@ -5,35 +5,36 @@ using System.Text;
 
 namespace DESpeedrunUtil.Overlay {
     internal static class LowHealthHudHook {
-        private static readonly int[] Sites = { 0x12AD3F3 };
-        private static readonly byte[][] Originals = { Convert.FromHexString("488B43104885C0") };
-        private const string Magic = "DESRUH02";
+        private const string Magic = "DESRUH03";
 
         internal static void Attach(Process game, IntPtr state) {
-            if(game.MainModule!.ModuleMemorySize != NativeSpeedometer.ModuleSize11) throw new NotSupportedException("Low-health tint supports the verified 1.1 build only");
+            var layout = NativeGameLayout.Resolve(game.MainModule!.FileName);
+            var profile = layout.Tint ?? throw new NotSupportedException(layout.TintFailure ?? "Cannot resolve low-health layout");
+            int[] Sites = { profile.HudHook };
+            byte[][] Originals = { Convert.FromHexString("488B43104885C0") };
             IntPtr image = game.MainModule.BaseAddress;
             var before = Sites.Select((site, i) => game.ReadBytes(image + site, Originals[i].Length) ?? Array.Empty<byte>()).ToArray();
-            if(before[0].SequenceEqual(Originals[0])) { Install(game, image, state, before); return; }
+            if(before[0].SequenceEqual(Originals[0])) { Install(game, image, state, before, profile, Sites, Originals); return; }
             if(before[0].Length != Originals[0].Length || before[0][0] != 0xE9) throw new NotSupportedException("Screen-vignette drawing was changed by another hook");
             IntPtr block = image + Sites[0] + 5 + BitConverter.ToInt32(before[0], 1);
             byte[] marker = game.ReadBytes(block + 0x300, 16) ?? Array.Empty<byte>();
             string oldMagic = marker.Length == 16 ? Encoding.ASCII.GetString(marker, 0, 8) : "";
-            byte[] expected = oldMagic == "DESRUH01" ? LowHealthTintCode.CreateHudDiscovery(state.ToInt64(), (image + 0x28EEB18).ToInt64(), (image + Sites[0] + Originals[0].Length).ToInt64()) :
-                LowHealthTintCode.CreateHudControl(state.ToInt64(), (image + 0x28EEB18).ToInt64(), (image + Sites[0] + Originals[0].Length).ToInt64());
+            byte[] expected = oldMagic == "DESRUH01" ? LowHealthTintCode.CreateHudDiscovery(state.ToInt64(), (image + profile.HudVtable).ToInt64(), (image + Sites[0] + Originals[0].Length).ToInt64()) :
+                LowHealthTintCode.CreateHudControl(state.ToInt64(), (image + profile.HudVtable).ToInt64(), (image + Sites[0] + Originals[0].Length).ToInt64(), profile.SwfRootOffset);
             if(!(game.ReadBytes(block, expected.Length) ?? Array.Empty<byte>()).SequenceEqual(expected) || marker.Length != 16 ||
-                (oldMagic != Magic && oldMagic != "DESRUH01") || BitConverter.ToInt64(marker, 8) != state.ToInt64())
+                (oldMagic != Magic && oldMagic != "DESRUH01" && oldMagic != "DESRUH02") || BitConverter.ToInt64(marker, 8) != state.ToInt64())
                 throw new NotSupportedException("HUD tint bridge does not match this session");
-            if(oldMagic != Magic) Install(game, image, state, before);
+            if(oldMagic != Magic) Install(game, image, state, before, profile, Sites, Originals);
         }
 
-        private static void Install(Process game, IntPtr image, IntPtr state, byte[][] before) {
+        private static void Install(Process game, IntPtr image, IntPtr state, byte[][] before, NativeTintLayout profile, int[] Sites, byte[][] Originals) {
             IntPtr allocation = AllocateNear(game, image + Sites[0]);
             if(allocation == IntPtr.Zero) throw new InvalidOperationException("No free memory within low-health JMP range");
             bool mayBeReferenced = false;
             try {
                 byte[] page = new byte[4096];
                 for(int i = 0; i < Sites.Length; i++) {
-                    byte[] bridge = LowHealthTintCode.CreateHudControl(state.ToInt64(), (image + 0x28EEB18).ToInt64(), (image + Sites[i] + Originals[i].Length).ToInt64());
+                    byte[] bridge = LowHealthTintCode.CreateHudControl(state.ToInt64(), (image + profile.HudVtable).ToInt64(), (image + Sites[i] + Originals[i].Length).ToInt64(), profile.SwfRootOffset);
                     bridge.CopyTo(page, i * 0x100);
                 }
                 Encoding.ASCII.GetBytes(Magic).CopyTo(page, 0x300);

@@ -10,6 +10,7 @@ internal static class NativeAdapterTests {
     [UnmanagedFunctionPointer(CallingConvention.Winapi)] private delegate void Draw(IntPtr gui, float x, float y, IntPtr text, IntPtr color, byte forceColor, float scale);
     [UnmanagedFunctionPointer(CallingConvention.Winapi)] private delegate void AddCommand(IntPtr self, IntPtr name, IntPtr callback, IntPtr help, IntPtr autocomplete, uint flags);
     [UnmanagedFunctionPointer(CallingConvention.Winapi)] private delegate void Command(IntPtr args);
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)] private delegate void Print(int channel, int severity, IntPtr format, IntPtr arguments);
 
     internal static void Run(Action<bool, string> check) {
         using var process = Process.GetCurrentProcess();
@@ -18,6 +19,8 @@ internal static class NativeAdapterTests {
         var draws = new List<(IntPtr Gui, float X, float Y, string Text, float Scale, byte Force, float[] Color)>();
         var commands = new List<(string Name, IntPtr Callback, uint Flags)>();
         int originals = 0;
+        var messages = new List<(int Channel, int Severity, string Format, string Text)>();
+        Print print = (channel, severity, format, arguments) => messages.Add((channel, severity, Marshal.PtrToStringAnsi(format)!, Marshal.PtrToStringAnsi(Marshal.ReadIntPtr(arguments))!));
         Hud original = (_, _) => originals++;
         Dimension width = _ => 1920;
         Dimension height = _ => 1080;
@@ -46,7 +49,7 @@ internal static class NativeAdapterTests {
             process.WriteBytes(memory, NativeSpeedometerCode.Render(memory.ToInt64(), state.ToInt64(),
                 Marshal.GetFunctionPointerForDelegate(original).ToInt64(), Marshal.GetFunctionPointerForDelegate(draw).ToInt64(),
                 Marshal.GetFunctionPointerForDelegate(width).ToInt64(), Marshal.GetFunctionPointerForDelegate(height).ToInt64(),
-                123, Marshal.GetFunctionPointerForDelegate(add).ToInt64()));
+                123, Marshal.GetFunctionPointerForDelegate(add).ToInt64(), Marshal.GetFunctionPointerForDelegate(print).ToInt64()));
             for(int i = 0; i < NativeSpeedometerCode.Commands.Length; i++) process.WriteBytes(memory + NativeSpeedometerCode.CallbackStart + i * NativeSpeedometerCode.CallbackStride,
                 NativeSpeedometerCode.Command((state + 0x400 + i * 0x80).ToInt64(), i == 6 ? 4 : 2));
             var render = Marshal.GetDelegateForFunctionPointer<Hud>(memory);
@@ -106,12 +109,22 @@ internal static class NativeAdapterTests {
                 Marshal.WriteInt32(args, 1); colorCallback(args); mail = process.ReadBytes(state + 0x700, 144);
                 check(Enumerable.Range(0, 4).All(i => mail[16 + i * 32] == 0), "Short RGB requests clear every previous argument");
             } finally { foreach(var p in colorArgs) Marshal.FreeHGlobal(p); }
+            process.WriteBytes(state, new byte[4]);
+            process.WriteBytes(state + NativeSpeedometerCode.ConsoleTextOffset, Encoding.ASCII.GetBytes("help with literal %n and 100%\n\0"));
+            process.WriteBytes(state + NativeSpeedometerCode.ConsoleReadyOffset, BitConverter.GetBytes(1));
+            int beforeHelp = originals;
+            render(new IntPtr(100), new IntPtr(200));
+            check(messages.Count == 1 && messages[0] == (1, 1, "%s", "help with literal %n and 100%\n"), "Console response uses the verified VPrintf ABI and a constant format string");
+            check(originals == beforeHelp + 1 && process.ReadValue<int>(state + NativeSpeedometerCode.ConsoleReadyOffset) == 0, "Help works while speedometers are hidden, preserves original HUD, and acknowledges the buffer");
+            render(new IntPtr(100), new IntPtr(200));
+            check(messages.Count == 1, "Console response is printed exactly once per publication");
         } finally {
             if(args != IntPtr.Zero) Marshal.FreeHGlobal(args);
             if(value != IntPtr.Zero) Marshal.FreeHGlobal(value);
             if(target != IntPtr.Zero) Marshal.FreeHGlobal(target);
             process.FreeMemory(memory);
             GC.KeepAlive(original); GC.KeepAlive(width); GC.KeepAlive(height); GC.KeepAlive(draw); GC.KeepAlive(add);
+            GC.KeepAlive(print);
         }
     }
 }
