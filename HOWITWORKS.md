@@ -1,4 +1,4 @@
-#### This file explains how DESRU works under the hood.
+﻿#### This file explains how DESRU works under the hood.
 
 *If you're looking for instructions on how to use DESRU, click the* **HELP** *button in DESRU. That page will explain basically everything you need to know regarding how to use it.*
 ## Memory
@@ -22,6 +22,8 @@ rs_dropMilliseconds [c] - Maximum frametime before lowering the resolution scale
 DESRU also modifies the Medium Perf Metrics strings (for the OSD), and an array of 32 resolution % values (for the res unlocker).
 
 ## On-Screen Display
+The optional speed meters use the game's HUD text renderer on version 1.1, including fullscreen. The speedometer commands control overall visibility, an independent landing-speed preference, pixel coordinates, shared size, and separate RGB colors. Current speed and the last-landing impulse are separate text draws with two decimals; each is clamped using its own width. They do not replace the performance-metrics rows below. A read-only worker captures the landing impulse using velocity and `playerPState_t.groundPlane`. See [SPEEDOMETERS.md](docs/SPEEDOMETERS.md) for commands, memory/rendering evidence, lifecycle, support and tests.
+
 As mentioned above, performance metrics are forced to Medium (2). The text that shows up there is modified to show the state of various things.
 
 ### Row 1
@@ -102,3 +104,6 @@ This means the window resizing needs to happen every time it changes, so the 2x 
 While DESRU can detect if slopeboosting is disabled (via `pm_allowRampJumping 0`), the option to actually enable/disable this isn't included as the autosplitter handles this.  
 Having the option stay in the autosplitter allows the user to have it disabled only for certain split files they have open. So they could have slopeboosting disabled for Limited runs done on 1.0, but enabled for Unrestricted runs, all without having to change any setting in DESRU.
 
+
+## Low-health red tint
+`desru_lowhptintopacity` (0..100, default 100) scales two separate low-health visual layers: the player screen-FX vignette and `idHUD_LowWarning`'s `lowHealth/backgroundFx` SWF container. A game-thread hook resolves the live display entry every frame and scales both alpha terms while retaining game-side updates. The HUD text, warnings, damage effects, health values and low/critical thresholds are not edited. Dedicated heartbeat expiry restores the captured original alpha even when the speedometers are hidden. Whole-instruction patches are installed with the game briefly suspended, exact signatures and ownership are checked, and registered code remains allocated until game exit. See section 13 of the Russian implementation report for addresses and validation.
