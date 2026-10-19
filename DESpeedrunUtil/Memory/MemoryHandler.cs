@@ -1,5 +1,6 @@
 ﻿using DESpeedrunUtil.Hotkeys;
 using DESpeedrunUtil.Util;
+using DESpeedrunUtil.Overlay;
 using Newtonsoft.Json;
 using Serilog;
 using System.ComponentModel;
@@ -61,20 +62,22 @@ namespace DESpeedrunUtil.Memory {
         internal bool MinimalOSD => _minimalOSD;
         public bool EnableCheats { get; set; } = false;
         public bool PotentiallyModdedUWP { get; private set; } = false;
-        System.Timers.Timer _restartCheatsTimer;
+        System.Timers.Timer _externalToolsTimer;
+        bool _cheatEngineDetected;
         int _moduleSize;
         public GameVersion Version { get; init; }
         public float CurrentResScaling { get; private set; } = 0f;
         public bool UseDynamicScaling { get; set; } = true;
 
         bool _osdFlagMeath00k = false, _osdFlagMacro = false, _osdFlagFirewall = false, _osdFlagSlopeboost = false, _osdFlagReshade = false,
-             _osdFlagOutOfDate = false, _osdFlagRestartGame = false, _osdFlagLimiter = true, _osdFlagModded = false,
+             _osdFlagLightingFix = false,
+             _osdFlagOutOfDate = false, _osdFlagLimiter = true, _osdFlagModded = false,
              _unlockResFlag = false, _autoScaling = false, _resUnlocked = false,
              _trainerFlag = false, _externalTrainerFlag = false, _scheduleScaling = false,
              _antiAliasing = true, _unDelay = true, _autoContinue = false,
              _minimalOSD = false;
         string _row1, _row2, _row3, _row4, _row5, _row6, _row7, _row8, _row9, _cpu, _gpuN;
-        string _cheatString = "CHEATS ENABLED", _scrollString = "", _resetRunString = "";
+        string _scrollString = "", _resetRunString = "";
         int _fpsLimit = 250, _targetFPS = 1000;
         float _minRes = 0.01f;
 
@@ -105,9 +108,9 @@ namespace DESpeedrunUtil.Memory {
             MemoryTimer.Interval = Program.TimerInterval;
             MemoryTimer.Tick += (sender, e) => { MemoryTick(); };
 
-            _restartCheatsTimer = new System.Timers.Timer(2500);
-            _restartCheatsTimer.Elapsed += (sender, e) => { RestartTick(); };
-            _restartCheatsTimer.Start();
+            _externalToolsTimer = new System.Timers.Timer(2500);
+            _externalToolsTimer.Elapsed += (sender, e) => { CheckExternalTools(); };
+            _externalToolsTimer.Start();
 
             Reset = false;
             Initialize();
@@ -116,7 +119,7 @@ namespace DESpeedrunUtil.Memory {
 
 
         private void MemoryTick() {
-            if(!_restartCheatsTimer.Enabled) _restartCheatsTimer.Start();
+            if(!_externalToolsTimer.Enabled) _externalToolsTimer.Start();
 
             DerefPointers();
 
@@ -214,30 +217,15 @@ namespace DESpeedrunUtil.Memory {
 
             if(!_externalTrainerFlag && EnableOSD) {
                 if(!_trainerFlag || (!_osdFlagMeath00k && !EnableCheats)) {
-                    if(_osdFlagRestartGame) _cheatString = "RESTART GAME";
-                    if(EnableCheats)
-                        _cheatString = "CHEATS ENABLED";
-                    else if(_osdFlagMeath00k)
-                        _cheatString = "MEATH00K";
-
-                    StringBuilder builderR2 = new(Version.Name.Replace(" Rev ", "r").Replace(" (Gamepass)", ""));
-                    builderR2.Replace("1.0 (Release)", "Release");
-                    if(_osdFlagMacro || _osdFlagFirewall || _osdFlagSlopeboost || _osdFlagReshade || !_osdFlagLimiter) {
-                        builderR2.Append(" (");
-                        if(_osdFlagMacro) builderR2.Append('M');
-                        if(_osdFlagFirewall) builderR2.Append('F');
-                        if(_osdFlagReshade) builderR2.Append('R');
-                        if(_osdFlagSlopeboost) builderR2.Append('S');
-                        if(!_osdFlagLimiter) builderR2.Append('L');
-                        builderR2.Append(')');
-                    }
-                    var cheats = (_osdFlagMeath00k || EnableCheats || _osdFlagRestartGame) ? _cheatString : string.Empty;
+                    string modifierFlags = OsdModifiers.Flags(_osdFlagMacro,_osdFlagFirewall,_osdFlagReshade,_osdFlagSlopeboost,!_osdFlagLimiter,_osdFlagLightingFix);
+                    StringBuilder builderR2 = new(OsdModifiers.Version(Version.Name,modifierFlags));
+                    // Live disabling restores the session; show only the current mode.
+                    var cheats = EnableCheats ? "CHEATS ENABLED" : _osdFlagMeath00k ? "MEATH00K" : string.Empty;
                     if(_osdFlagModded) {
                         if(cheats == string.Empty) {
                             cheats = "MODDED CLIENT";
                         } else {
-                            if(!_osdFlagRestartGame)
-                                cheats += " (MOD)";
+                            cheats += " (MOD)";
                         }
                     }
                     if(_resetRunString != string.Empty) cheats = _resetRunString;
@@ -354,9 +342,9 @@ namespace DESpeedrunUtil.Memory {
                 }
             }
         }
-        private void RestartTick() {
+        private void CheckExternalTools() {
             // Checks if the trainer is running
-            // If the trainer is detected, metric rows are no longer modified, and the restart game flag is set to true
+            // If the trainer is detected, metric rows are no longer modified.
             // This is done here since this process takes upwards of 3ms and this timer has a longer interval.
             // This will eventually be removed once the trainer is integrated directly into DESRU
             List<Process> processes = Process.GetProcesses().ToList();
@@ -364,7 +352,6 @@ namespace DESpeedrunUtil.Memory {
                 var trainers = processes.FindAll(x => x.ProcessName.Contains("DoomEternalTrainer"));
                 if(trainers.Count > 0) {
                     _trainer = trainers[0];
-                    if(!_osdFlagMeath00k) SetFlag(true, "restart");
                     _externalTrainerFlag = true;
                     Log.Information("Trainer process found running.");
                 } else {
@@ -377,10 +364,9 @@ namespace DESpeedrunUtil.Memory {
                     _externalTrainerFlag = false;
                 }
             }
-            if(!_osdFlagRestartGame) {
+            if(!_cheatEngineDetected) {
                 if(!_osdFlagMeath00k && processes.FindAll(x => x.ProcessName.ToLower().Contains("cheatengine")).Count > 0) {
-                    SetFlag(true, "restart");
-                    _cheatString = "RESTART GAME";
+                    _cheatEngineDetected = true;
                     Log.Warning("CheatEngine process found running.");
                 }
             }
@@ -543,7 +529,7 @@ namespace DESpeedrunUtil.Memory {
         /// Stops timers and sets 3rd metrics row to a <see cref="string"/> indicating DESRU was closed
         /// </summary>
         public void ClosingDESRU() {
-            _restartCheatsTimer.Stop();
+            _externalToolsTimer.Stop();
             MemoryTimer.Stop();
             _row3 = "DESRU CLOSED";
             if(_currentOffsets.Version.Contains("Unknown")) {
@@ -694,6 +680,9 @@ namespace DESpeedrunUtil.Memory {
         /// <param name="flagName">Name of the flag being set</param>
         public void SetFlag(bool flag, string flagName) {
             switch(flagName) {
+                case "lightingfix":
+                    _osdFlagLightingFix = flag;
+                    break;
                 case "meath00k":
                     _osdFlagMeath00k = flag;
                     break;
@@ -711,9 +700,6 @@ namespace DESpeedrunUtil.Memory {
                     break;
                 case "reshade":
                     _osdFlagReshade = flag;
-                    break;
-                case "restart":
-                    _osdFlagRestartGame = flag;
                     break;
                 case "slopeboost":
                     _osdFlagSlopeboost = flag;
@@ -753,13 +739,13 @@ namespace DESpeedrunUtil.Memory {
         /// <returns>State of the specified <see langword="bool"/> flag</returns>
         public bool GetFlag(string flagName) {
             return flagName switch {
+                "lightingfix" => _osdFlagLightingFix,
                 "meath00k" => _osdFlagMeath00k,
                 "firewall" => _osdFlagFirewall,
                 "limiter" => _osdFlagLimiter,
                 "macro" => _osdFlagMacro,
                 "outofdate" => _osdFlagOutOfDate,
                 "reshade" => _osdFlagReshade,
-                "restart" => _osdFlagRestartGame,
                 "slopeboost" => _osdFlagSlopeboost,
                 "resunlocked" => _resUnlocked,
                 "unlockscheduled" => _unlockResFlag,

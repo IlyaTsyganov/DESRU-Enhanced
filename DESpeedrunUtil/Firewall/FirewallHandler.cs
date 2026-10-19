@@ -7,12 +7,11 @@ namespace DESpeedrunUtil.Firewall {
         private static readonly string FWRULE_NAME = "DOOMEternal (SR Utility)";
 
         /// <summary>
-        /// Checks if an outbound firewall rule blocking DOOMEternalx64vk exists.
+        /// Checks for an enabled outbound block without changing any rules.
         /// </summary>
         /// <param name="application">Full path of DOOMEternalx64vk.exe</param>
-        /// <param name="delete"><see langword="true"/> to delete the detected rule</param>
-        /// <returns><see langword="true"/> if a matching rule is detected</returns>
-        public static bool CheckForFirewallRule(string application, bool delete) {
+        /// <returns><see langword="true"/> if an enabled matching block is detected</returns>
+        public static bool CheckForFirewallRule(string application) {
             INetFwPolicy2 policy2 = (INetFwPolicy2) Activator.CreateInstance(Type.GetTypeFromProgID("HNetCfg.FwPolicy2"));
             if(policy2 == null) {
                 Log.Error("Firewall Policy was null. Aborting.");
@@ -23,28 +22,40 @@ namespace DESpeedrunUtil.Firewall {
                     Log.Error("Firewall rule was null. Aborting.");
                     return false;
                 }
-                if(rule.Direction == NET_FW_RULE_DIRECTION_.NET_FW_RULE_DIR_OUT && rule.ApplicationName == application) {
-                    if(delete) {
-                        policy2.Rules.Remove(rule.Name);
-                        Log.Information("Firewall rule deleted. path: {Path}", rule.ApplicationName);
-                    }
-                    if(!rule.Enabled && !delete) {
-                        Log.Information("Firewall rule detected but not enabled. Enabling...");
-                        rule.Enabled = true;
-                    }
-                    return true;
-                }
+                if(IsApplicationBlock(rule, application) && rule.Enabled) return true;
             }
             return false;
         }
 
         /// <summary>
-        /// Creates a new outbound firewall rule blocking DOOMEternalx64vk
+        /// Enables or disables every matching outbound block, including duplicates.
+        /// Rule objects are updated directly because names can be shared by other installations.
+        /// </summary>
+        public static void SetFirewallRuleEnabled(string application, bool enabled, int num = 0) {
+            INetFwPolicy2 policy2 = (INetFwPolicy2) Activator.CreateInstance(Type.GetTypeFromProgID("HNetCfg.FwPolicy2"));
+            var matches = policy2.Rules.Cast<INetFwRule>().Where(rule => IsApplicationBlock(rule, application)).ToList();
+            foreach(var rule in matches) {
+                if(rule.Enabled == enabled) continue;
+                rule.Enabled = enabled;
+                Log.Information("Firewall rule {State}. path: {Path}", enabled ? "enabled" : "disabled", rule.ApplicationName);
+            }
+            if(enabled && matches.Count == 0) AddFirewallRule(policy2, application, num);
+        }
+
+        private static bool IsApplicationBlock(INetFwRule rule, string application) =>
+            rule.Direction == NET_FW_RULE_DIRECTION_.NET_FW_RULE_DIR_OUT &&
+            rule.Action == NET_FW_ACTION_.NET_FW_ACTION_BLOCK &&
+            string.Equals(rule.ApplicationName, application, StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Ensures an outbound firewall block exists without creating duplicates.
         /// </summary>
         /// <param name="application">Full path of DOOMEternalx64vk.exe</param>
         public static void CreateFirewallRule(string application, int num) {
-            INetFwPolicy2 policy2 = (INetFwPolicy2) Activator.CreateInstance(Type.GetTypeFromProgID("HNetCfg.FwPolicy2"));
+            SetFirewallRuleEnabled(application, true, num);
+        }
 
+        private static void AddFirewallRule(INetFwPolicy2 policy2, string application, int num) {
             INetFwRule2 fwRule = (INetFwRule2) Activator.CreateInstance(Type.GetTypeFromProgID("HNetCfg.FWRule"));
             fwRule.Enabled = true;
             fwRule.Action = NET_FW_ACTION_.NET_FW_ACTION_BLOCK;

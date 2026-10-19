@@ -26,7 +26,7 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(HelpPage));
             closeButton = new Button();
             pictureBox1 = new PictureBox();
-            helpTextbox = new TextBox();
+            helpTextbox = new Controls.HelpScrollTextBox();
             helpTabButton0 = new Button();
             helpTabButton1 = new Button();
             helpTabButton2 = new Button();
@@ -305,7 +305,7 @@
         private Button helpTabButton3;
         private Button helpTabButton4;
         private Button helpTabButton5;
-        private TextBox helpTextbox;
+        private Controls.HelpScrollTextBox helpTextbox;
         private Button helpTabButton6;
         private PictureBox helpPageVersionImage;
         private PictureBox helpPageOSDImage;

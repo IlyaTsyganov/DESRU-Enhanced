@@ -45,10 +45,11 @@ L - Framerate Limiter is disabled or unsupported; User must limit their frames t
 ### Row 3
 Below the version, a few things can show up.
 ```
-CHEATS ENABLED -> meath00k is detected
-RESTART GAME   -> DESRU was started after DOOMEternal or CheatEngine/Trainer was detected at some point
+CHEATS ENABLED -> cheats are currently enabled
+MEATH00K       -> meath00k is active without the console-cheats toggle
 DESRU CLOSED   -> DESRU was closed by the user
 ```  
+The cheat indicator clears when both cheats and meath00k are disabled. Live switching and starting DESRU after the game no longer leave a persistent restart message. External trainer detection still stops DESRU from modifying metric rows while that trainer is running.
 This row will also display a scroll pattern tracker.  
 Format: `X (Y.YYms)` X == # of scroll inputs; Y == avg time between scroll inputs  
 *note: short scroll strings may have some error in the time delta. This works itself out very quickly with more scroll inputs.  
@@ -56,7 +57,7 @@ Format: `X (Y.YYms)` X == # of scroll inputs; Y == avg time between scroll input
 
 ### Row 4+
 Rest of the rows are set to a blank string.  
-*Non-NVIDIA GPU users may find one of these rows to be unmodified. Nothing I can do about this since I only have NVIDIA GPUs.*
+The driver-name row follows the actual `idStr` data pointer, so long names such as `AMD proprietary driver` are hidden as well as short inline names. Only the first character is cleared; the string header and neighboring driver-version strings are preserved. This keeps the existing multi-line OSD layout.
 
 ### Unsupported Versions
 Since DESRU cannot modify `com_showConsumerPerfMetrics` on unsupported versions, the OSD is modified to display on a single line in the case that the user has their Performance Metrics set to Low.  
@@ -107,10 +108,12 @@ Having the option stay in the autosplitter allows the user to have it disabled o
 
 ## Low-health red tint
 `desru_lowhptintopacity` (0..100, default 100) scales two separate low-health visual layers: the player screen-FX vignette and `idHUD_LowWarning`'s `lowHealth/backgroundFx` SWF container. A game-thread hook resolves the live display entry every frame and scales both alpha terms while retaining game-side updates. The HUD text, warnings, damage effects, health values and low/critical thresholds are not edited. Dedicated heartbeat expiry restores the captured original alpha even when the speedometers are hidden. Whole-instruction patches are installed with the game briefly suspended, exact signatures and ownership are checked, and registered code remains allocated until game exit. See section 13 of the Russian implementation report for addresses and validation.
-
-
 # Live cheats and protected cvars
 
 The native speedometers wait for the game's console and font initialization when DESRU starts first, and retry temporary startup failures automatically. They do not switch to the desktop font while the supported game is still loading. Current game font metrics are used when updating the numbers.
 
 The running-game Cheats / Meath00k button enables and disables console cheats and the bundled mod together with one click, without restarting DOOM Eternal. Newly changed protected nondefault cvars and active noclip/notarget/god states appear in smaller text below the top-right DESRU modifiers, following the OSD font size and minimal/full layout. Initial preferences remain hidden. Disabling restores only changes made after activation, preserving initial preferences. See [LIVE-CHEATS.md](docs/LIVE-CHEATS.md) for behavior, implementation and validation details.
+
+# Native visual features
+
+Lighting Fix and Collision Viewer use the native bridge in `NativeVisuals/`, with a saved Lighting Fix switch/X modifier and cheat-gated, initially hidden Collision Viewer console commands. See [architecture, console commands and validation](docs/VISUAL-FEATURES.md). The viewer has no game-version whitelist and uses DESRU console commands instead of F-key bindings.

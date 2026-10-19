@@ -442,28 +442,36 @@ namespace DESpeedrunUtil {
             });
         }
         private void FirewallToggle_Click(object sender, EventArgs e) {
-            if(_fwRuleExists) {
-                FirewallHandler.CheckForFirewallRule(_gameDirectory + "\\DOOMEternalx64vk.exe", true);
-                foreach(string dir in _extraGameDirectories) FirewallHandler.CheckForFirewallRule(dir + "\\DOOMEternalx64vk.exe", true);
-                firewallToggleButton.Text = "Create Firewall Rule";
-                if(_fwRestart) _fwRestart = false;
-                _fwRuleExists = false;
-                if(Hooked) {
-                    Memory.SetFlag(_fwRuleExists, "firewall");
+            firewallToggleButton.Enabled = false;
+            try {
+                RefreshFirewallStatus();
+                bool enabled = !_fwRuleExists;
+                var applications = new[] { Path.Combine(_gameDirectory, "DOOMEternalx64vk.exe") }
+                    .Concat(_extraGameDirectories.Select(dir => Path.Combine(dir, "DOOMEternalx64vk.exe")))
+                    .Append(FirewallApplicationPath()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                for(int i = 0; i < applications.Count; i++) {
+                    FirewallHandler.SetFirewallRuleEnabled(applications[i], enabled, i);
                 }
-                firewallRestartLabel.ForeColor = COLOR_PANEL_BACK;
-            } else {
-                if(!FirewallHandler.CheckForFirewallRule(_gameDirectory + "\\DOOMEternalx64vk.exe", false))
-                    FirewallHandler.CreateFirewallRule(_gameDirectory + "\\DOOMEternalx64vk.exe", 0);
-                for(int i = 0; i < _extraGameDirectories.Count; i++) {
-                    if(!FirewallHandler.CheckForFirewallRule(_extraGameDirectories[i] + "\\DOOMEternalx64vk.exe", false))
-                        FirewallHandler.CreateFirewallRule(_extraGameDirectories[i] + "\\DOOMEternalx64vk.exe", i + 1);
-                }
-                firewallToggleButton.Text = "Remove Firewall Rule";
-                _fwRestart = true;
-                _fwRuleExists = true;
-                if(Hooked) firewallRestartLabel.ForeColor = COLOR_TEXT_FORE;
+                _fwRestart = enabled && Hooked;
+            } catch(Exception error) {
+                Log.Error(error, "Could not toggle the DOOM Eternal firewall rules");
+                MessageBox.Show(this, error.Message, "Firewall Rule", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            } finally {
+                try { RefreshFirewallStatus(); }
+                catch(Exception error) { Log.Error(error, "Could not refresh firewall state after toggling"); }
+                firewallToggleButton.Enabled = true;
             }
+        }
+
+        private string FirewallApplicationPath() =>
+            Hooked && GameProcess != null && !GameProcess.MainModule!.FileName.Contains("WindowsApps")
+                ? GameProcess.MainModule.FileName : Path.Combine(_gameDirectory, "DOOMEternalx64vk.exe");
+
+        private void RefreshFirewallStatus() {
+            _fwRuleExists = FirewallHandler.CheckForFirewallRule(FirewallApplicationPath());
+            Memory?.SetFlag(_fwRuleExists, "firewall");
+            firewallToggleButton.Text = _fwRuleExists ? "Disable Firewall Rule" : "Enable Firewall Rule";
+            firewallRestartLabel.ForeColor = _fwRuleExists && _fwRestart ? COLOR_TEXT_FORE : COLOR_PANEL_BACK;
         }
         private async void CheatsToggle_Click(object sender, EventArgs e) {
             if(Hooked) {
