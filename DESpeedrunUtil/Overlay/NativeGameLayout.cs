@@ -10,6 +10,8 @@ namespace DESpeedrunUtil.Overlay {
         public NativeTintLayout? Tint { get; init; }
         public string? TintFailure { get; init; }
         public NativeCvarLayout? Cvars { get; init; }
+        public NativeModbotInputLayout? ModbotInput { get; init; }
+        public string? ModbotInputFailure { get; init; }
         public int[] PlayerCheatSetters { get; init; } = Array.Empty<int>();
         public NativePlayerCheatLayout? PlayerCheats { get; init; }
         private static readonly Dictionary<string, NativeGameLayout> Cache = new();
@@ -114,6 +116,83 @@ namespace DESpeedrunUtil.Overlay {
                     }
                 }
                 return Unique(tables, name + " primary RTTI vtable");
+            }
+            private int Import(string function) {
+                // Locate a named import through its hint/name RVA and original thunk.
+                // Validate each candidate against a real import descriptor/IAT pair.
+                int pe = Int(0x3c), optional = pe + 24;
+                int descriptors = Offset(Int(optional + 120)); // PE32+ import directory
+                for(int i = 0; i < 2048; i++) {
+                    int descriptor = descriptors + i * 20;
+                    int original = Int(descriptor), name = Int(descriptor + 12), first = Int(descriptor + 16);
+                    if(name == 0) break;
+                    if(original == 0 || first == 0) continue;
+                    int thunk = Offset(original);
+                    for(int j = 0; j < 65536; j++) {
+                        long entry = Long(thunk + j * 8);
+                        if(entry == 0) break;
+                        if(entry < 0 || entry > int.MaxValue) continue; // ordinal import
+                        if(Text(_base + entry + 2) == function) return checked(first + j * 8);
+                    }
+                }
+                throw new NotSupportedException("Missing game import: " + function);
+            }
+            private NativeModbotInputLayout ResolveModbotInput() {
+                int menu = Vtable(".?AVidHUDMenu_ModBot@@"), tabs = Vtable(".?AVidSWFWidget_TabList@@");
+                int parent = Vtable(".?AVidMenuElement@@"), widget = Vtable(".?AVidSWFWidget@@");
+                int Method(int table, int slot) {
+                    long target = Long(Offset(table + slot * 8)) - _base;
+                    if(target<0||target>int.MaxValue||!IsCode((int)target)) throw new NotSupportedException("Invalid modbot virtual method");
+                    return (int)target;
+                }
+                int tabOffset = Field("idHUDMenu_ModBot", "weaponTabList"), rootOffset = Field("idUIElement", "rootWidget");
+                int inputState = Field("idSWF", "inputState");
+                byte[] Body(int target,int limit=256) {
+                    var bytes=Bytes.Slice(Offset(target),limit);
+                    int end=bytes.IndexOf(new byte[]{0xcc,0xcc,0xcc});
+                    return bytes[..(end<0?bytes.Length:end)].ToArray();
+                }
+                bool Calls(int source, int target) {
+                    int at = Offset(source),length=Body(source,96).Length;
+                    for(int i = 0; i+5<=length; i++) if(Bytes[at+i] is 0xe8 or 0xe9 && (long)Rva(at+i)+5+Int(at+i+1) == target) return true;
+                    return false;
+                }
+                int[] Slots(int table) {
+                    var slots=new List<int>();
+                    for(int i=0;i<96;i++) { try { Method(table,i);slots.Add(i); } catch(NotSupportedException) { break; } }
+                    return slots.ToArray();
+                }
+                var enterInput=new byte[]{0xc7,0x80}.Concat(BitConverter.GetBytes(inputState)).Concat(BitConverter.GetBytes(1)).ToArray();
+                var enterShort=inputState is >=0 and <=127?new byte[]{0xc7,0x40,(byte)inputState,1,0,0,0}:Array.Empty<byte>();
+                int showSlot=Unique(Slots(menu).Where(slot=> {
+                    int method=Method(menu,slot);var code=Body(method);
+                    return method!=Method(parent,slot)&&Calls(method,Method(parent,slot))&&code.AsSpan().IndexOf(BitConverter.GetBytes(tabOffset))>=0&&
+                        (code.AsSpan().IndexOf(enterInput)>=0 || enterShort.Length>0&&code.AsSpan().IndexOf(enterShort)>=0);
+                }),"modbot show method");
+                int hideSlot=showSlot+1;
+                int thinkSlot=Unique(Slots(menu).Where(slot=> {
+                    int method=Method(menu,slot);
+                    return method!=Method(parent,slot)&&Body(method,96).AsSpan().IndexOf(BitConverter.GetBytes(Field("idHUDMenu_ModBot","currentPlatform")))>=0;
+                }),"modbot update method");
+                int eventType = Field("idSWFWidgetEvent", "type");
+                int nextEvent=EnumValue("SWFWidgetEvent_t","SWF_EVENT_TAB_NEXT"),prevEvent=EnumValue("SWFWidgetEvent_t","SWF_EVENT_TAB_PREV");
+                if(nextEvent<1||nextEvent>127||prevEvent!=nextEvent+1)throw new NotSupportedException("Unrecognized tab event values");
+                bool SelectsTabPair(byte[] code) {
+                    if(code.AsSpan().IndexOf(new byte[]{0x83,0xe8,(byte)nextEvent,0x83,0xf8,1})>=0||
+                        code.AsSpan().IndexOf(new byte[]{0x83,0xc0,unchecked((byte)-nextEvent),0x83,0xf8,1})>=0)return true;
+                    for(byte register=0x40;register<=0x47;register++) if(register!=0x44&&
+                        code.AsSpan().IndexOf(new byte[]{0x8d,register,unchecked((byte)-nextEvent),0x83,0xf8,1})>=0)return true;
+                    return false;
+                }
+                int receiveSlot=Unique(Slots(tabs).Where(slot=> {
+                    int method=Method(tabs,slot);var code=Body(method,48);
+                    return method!=Method(widget,slot)&&SelectsTabPair(code);
+                }),"tab-navigation receiver");
+                if(eventType!=8||!Calls(Method(menu,hideSlot),Method(parent,hideSlot)))throw new NotSupportedException("Unrecognized modbot close/event layout");
+                return new(menu,Method(menu,showSlot),Method(menu,hideSlot),Method(menu,thinkSlot),tabs,Method(tabs,receiveSlot),tabOffset,rootOffset,
+                    Field("idSWFWidget","parentWidget"),eventType,Import("GetAsyncKeyState"),0) {
+                    ShowSlot=showSlot,HideSlot=hideSlot,ThinkSlot=thinkSlot,ReceiveSlot=receiveSlot,NavigationEventFirst=nextEvent
+                };
             }
             private int GroundOffset() {
                 var results = new List<int>();
@@ -260,6 +339,8 @@ namespace DESpeedrunUtil.Overlay {
                 catch(NotSupportedException) { }
                 try { layout = layout with { PlayerCheats = new(PlayerCheatFlag("noClip"), PlayerCheatFlag("noTarget"), PlayerCheatFlag("godMode")) }; }
                 catch(NotSupportedException) { }
+                try { layout = layout with { ModbotInput = ResolveModbotInput() }; }
+                catch(NotSupportedException e) { layout = layout with { ModbotInputFailure = e.Message }; }
                 return layout;
             }
             public void Dispose() {

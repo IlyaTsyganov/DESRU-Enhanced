@@ -2722,7 +2722,6 @@
             SizeGripStyle = SizeGripStyle.Hide;
             FormClosing += MainWindow_Closing;
             Load += MainWindow_Load;
-            Shown += MainWindow_Shown;
             KeyDown += HotkeyAssignment_KeyDown;
             MouseDown += HotkeyAssignment_MouseDown;
             MouseMove += DragWindow_MouseMove;

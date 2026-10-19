@@ -1,4 +1,14 @@
-# Release validation — DESRU-Enhanced v1.1.0
+# Release validation — DESRU-Enhanced v1.1.1
+
+- Managed Release x64 suite: 446 checks PASS, including executed x64 modbot guard fixtures and shifted Steam event IDs.
+- Layout resolution passed on 1.0 Release, 1.1 and Steam 6.66 Rev 3.2.
+- Manual 1.1 verification confirmed that modbot E/Q duplication disappeared; a second test was accepted. FPS remained 250.
+- Native graphics DLL is unchanged from v1.1.0; previous graphics/geometry validation below still applies.
+- Main application assembly identity stays 1.1.0.0 for settings continuity; file/product release version is 1.1.1.
+- Standalone startup/runtime/native/Help checks and ZIP integrity are repeated for the release package.
+
+## Previous native/visual release validation (v1.1.0)
+
 
 Validation performed on Windows x64, October 19–20, 2026.
 

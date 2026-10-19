@@ -6,6 +6,8 @@ namespace DESpeedrunUtil {
     public partial class MainWindow {
         private SpeedometerOverlay? _speedOverlay;
         private NativeSpeedometer? _nativeSpeedometer;
+        private NativeModbotInputGuard? _modbotInputGuard;
+        private bool _modbotInputWarningShown;
         private readonly NativeAttachRetry _nativeAttachRetry = new();
         private long _nextNativeAttachLog;
         private ProtectedCvarMonitor? _cvarMonitor;
@@ -32,6 +34,8 @@ namespace DESpeedrunUtil {
         private void ReleaseSpeedOverlays() {
             ReleaseVisualFeatures();
             Memory?.StopSpeedSampler();
+            _modbotInputGuard?.Dispose();_modbotInputGuard=null;
+            _modbotInputWarningShown=false;
             _nativeSpeedometer?.Dispose();
             _nativeSpeedometer = null;
             _nativeAttachRetry.Reset(); _nextNativeAttachLog = 0;
@@ -59,11 +63,17 @@ namespace DESpeedrunUtil {
                         if(_cheatCvarSession?.Active == true) Memory.EnableCheats = true;
                         if(Memory.EnableCheats && _cheatCvarSession != null) _cheatSessionBegin = _cheatCvarSession.BeginAsync();
                     } catch(Exception e) { Log.Warning(e, "Live cheat control is unavailable; native speedometers remain active"); }
+                    try {
+                        _modbotInputGuard=NativeModbotInputGuard.Attach(GameProcess,_nativeSpeedometer.Extension,_nativeSpeedometer.Layout);
+                        Log.Information("Modbot input protection attached");
+                    }
+                    catch(Exception e) { Log.Warning(e,"Modbot input protection is unavailable on this game build");WarnModbotProtectionUnavailable(); }
                     Log.Information("Native speedometers and console commands attached");
                     _nativeAttachRetry.Reset(); _nextNativeAttachLog = 0;
                 } catch(NotSupportedException e) {
                     _nativeAttachRetry.RejectUnsupported();
                     Log.Warning(e, "Native speedometers are unavailable on this game build; using the desktop fallback");
+                    WarnModbotProtectionUnavailable();
                 } catch(Exception e) {
                     _nativeAttachRetry.RetryLater(Environment.TickCount64);
                     if(Environment.TickCount64 >= _nextNativeAttachLog) {
@@ -74,6 +84,8 @@ namespace DESpeedrunUtil {
                 }
             }
             if(_nativeSpeedometer != null) {
+                try { _modbotInputGuard?.Update(Memory.ReadMaxHz() is >0 and <1000); }
+                catch(Exception e) { _modbotInputGuard?.Dispose();_modbotInputGuard=null;Log.Warning(e,"Modbot input protection stopped");WarnModbotProtectionUnavailable(); }
                 try {
                     bool changed = false;
                     foreach(var command in _nativeSpeedometer.ReadCommands()) {
@@ -96,6 +108,7 @@ namespace DESpeedrunUtil {
                 } catch(Exception e) {
                     Log.Warning(e, "Native speedometer update stopped; the original HUD remains active");
                     _nativeSpeedometer.Dispose();
+                    _modbotInputGuard?.Dispose();_modbotInputGuard=null;
                     _nativeSpeedometer = null;
                     _nativeAttachRetry.RetryLater(Environment.TickCount64);
                 }
@@ -115,6 +128,14 @@ namespace DESpeedrunUtil {
                 new SpeedometerReading(settings.CurrentSpeedOverlayEnabled, settings.CurrentSpeedOverlayX, settings.CurrentSpeedOverlayY, speed.Current, true, settings.CurrentSpeedOverlayScale, settings.CurrentSpeedOverlayColor),
                 new SpeedometerReading(settings.LandingSpeedOverlayEnabled, settings.LandingSpeedOverlayX, settings.LandingSpeedOverlayY,
                     speed.LastLanding, Memory.GroundContactSupported, settings.LandingSpeedOverlayScale, settings.LandingSpeedOverlayColor));
+        }
+
+        private void WarnModbotProtectionUnavailable() {
+            if(_modbotInputWarningShown||!Properties.Settings.Default.ShowFPSLimitWarning||Memory?.ReadMaxHz() is not (>0 and <1000))return;
+            _modbotInputWarningShown=true;var game=GameProcess;
+            BeginInvoke(new Action(()=> {
+                if(!IsDisposed&&GameProcess==game&&game?.HasExited==false&&_modbotInputGuard==null)ShowFPSLimiterFallbackWarning();
+            }));
         }
 
         private void UpdateProtectedCvarDisplay() {

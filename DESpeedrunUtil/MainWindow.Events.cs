@@ -644,7 +644,7 @@ namespace DESpeedrunUtil {
             RawInputDevice.UnregisterDevice(HidUsageAndPage.Mouse);
         }
 
-        private void MainWindow_Shown(object sender, EventArgs e) {
+        private void ShowFPSLimiterFallbackWarning() {
             if(Properties.Settings.Default.ShowFPSLimitWarning) {
                 var dialog = new FPSLimitWarning(this.Location, this.Width, this.Height);
                 Log.Information("Displayed FPS Limiter Warning to user.");
