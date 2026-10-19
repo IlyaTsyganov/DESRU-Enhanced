@@ -465,11 +465,9 @@ namespace DESpeedrunUtil {
                 if(Hooked) firewallRestartLabel.ForeColor = COLOR_TEXT_FORE;
             }
         }
-        private void CheatsToggle_Click(object sender, EventArgs e) {
+        private async void CheatsToggle_Click(object sender, EventArgs e) {
             if(Hooked) {
-                Memory.EnableCheats = true;
-                cheatsToggleButton.Enabled = false;
-                cheatsToggleButton.Text = "Restart Game to Disable Cheats";
+                await SwitchLiveCheats();
                 return;
             }
             if(_mhExists) {

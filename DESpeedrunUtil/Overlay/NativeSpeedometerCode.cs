@@ -1,4 +1,4 @@
-namespace DESpeedrunUtil.Overlay {
+﻿namespace DESpeedrunUtil.Overlay {
     // Windows x64 ABI adapter. Calls the original HUD renderer, then the game's text renderer.
     // No instructions in a game function are overwritten; only its aligned virtual slot is redirected.
     internal static class NativeSpeedometerCode {
@@ -7,7 +7,7 @@ namespace DESpeedrunUtil.Overlay {
             "desru_speedometer_showlanding", "desru_speedometer_color"
         };
         internal const int StateSize = 4096, CallbackStart = 0x500, CallbackStride = 0x100;
-        internal const string Magic = "DESRUS07";
+        internal const string Magic = "DESRUS08";
         internal const int ConsoleReadyOffset = 416, ConsoleFormatOffset = 420, ConsoleTextOffset = 432, ConsoleTextCapacity = 576;
 
         internal sealed class Code {
@@ -61,6 +61,8 @@ namespace DESpeedrunUtil.Overlay {
                 c.Emit("C783A001000000000000");
                 c.Label("consoleDone");
             }
+            c.Emit("488B83F8030000 4885C0"); c.Jump("0F84", "extensionDone");
+            c.Emit("488BC8 488BD6 FF10"); c.Label("extensionDone");
             c.Emit("833B00"); c.Jump("0F84", "done");
             c.Emit("F0FF0B 488BCE"); c.Call(width); c.Emit("F30F11442438");
             c.Emit("488BCE"); c.Call(height); c.Emit("F30F1144243C");

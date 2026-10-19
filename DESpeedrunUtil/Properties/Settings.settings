@@ -144,31 +144,31 @@
       <Value Profile="(Default)">192</Value>
     </Setting>
     <Setting Name="CurrentSpeedOverlayEnabled" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="LandingSpeedOverlayEnabled" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="CurrentSpeedOverlayX" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">40</Value>
+      <Value Profile="(Default)">0</Value>
     </Setting>
     <Setting Name="CurrentSpeedOverlayY" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">600</Value>
+      <Value Profile="(Default)">480</Value>
     </Setting>
     <Setting Name="LandingSpeedOverlayX" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">200</Value>
+      <Value Profile="(Default)">100</Value>
     </Setting>
     <Setting Name="LandingSpeedOverlayY" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">600</Value>
+      <Value Profile="(Default)">480</Value>
     </Setting>
     <Setting Name="CurrentSpeedOverlayScale" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">1</Value>
+      <Value Profile="(Default)">3.5</Value>
     </Setting>
     <Setting Name="LandingSpeedOverlayScale" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">1</Value>
+      <Value Profile="(Default)">3.5</Value>
     </Setting>
     <Setting Name="SpeedometerPositionsVersion" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">0</Value>
+      <Value Profile="(Default)">1</Value>
     </Setting>
     <Setting Name="LowHpTintOpacity" Type="System.Double" Scope="User">
       <Value Profile="(Default)">100</Value>

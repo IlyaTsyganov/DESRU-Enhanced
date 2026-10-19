@@ -1,16 +1,16 @@
 # Native horizontal speedometers
 
-Detailed implementation inventory in Russian: [IMPLEMENTATION-REPORT-RU.md](IMPLEMENTATION-REPORT-RU.md).
+[Implementation report](IMPLEMENTATION-REPORT-EN.md), [defaults](DEFAULTS.md), and [live cheats/modifier indicators](LIVE-CHEATS.md).
 
 DESRU now draws two numeric readings through the **game's own HUD text renderer**, including exclusive fullscreen. There are no additional checkboxes in DESRU. Start DESRU normally, open the game's console, and use:
 
 ```text
 desru_speedometer_show 1
-desru_speedometer_x_pos 40 current
-desru_speedometer_y_pos 600 current
-desru_speedometer_x_pos 200 landing
-desru_speedometer_y_pos 600 landing
-desru_speedometer_size 1
+desru_speedometer_x_pos 0 current
+desru_speedometer_y_pos 480 current
+desru_speedometer_x_pos 100 landing
+desru_speedometer_y_pos 480 landing
+desru_speedometer_size 3.5
 ```
 
 | Command | Values | Effect |
@@ -32,7 +32,7 @@ desru_speedometer_show 0 current
 
 Visibility and X/Y commands accept an optional target. Without a target they set the specified property for both meters; for example, `desru_speedometer_y_pos 600` aligns both on the same Y. Setting both X and Y without a target gives both readings identical positions, so use targets to separate them. X/Y are physical pixels, independent of Windows display scaling: `400,600` means 400 pixels right and 600 pixels down from the game's top-left corner. Native drawing converts these pixels to virtual HUD dimensions. Text size remains shared. Each reading is clamped at viewport edges using its own width; oversized text may be clipped. Invalid targets, negative coordinates, and values beyond Int32 range are ignored and logged. Earlier development builds used percentages; re-enter X/Y when switching from one of those builds.
 
-The source defaults keep current speed disabled until requested; landing speed is selected by default and appears when the master show command enables the meters. Existing saved preferences take priority. The prepared package enables both readings. Commands persist through DESRU's existing mechanism: independent enable flags, RGB colors and X/Y coordinates, shared size control. `SpeedometerPositionsVersion` records a one-time upgrade: if old positions are identical, landing X is shifted right by `ceil(160 × size)` pixels. Already different positions are preserved. Later identical positions are allowed and persist. DESRU must be running to apply and save commands. Close any older DESRU instance before starting this build. Normal DESRU launch advice still applies: start the utility before the game.
+The source and package defaults enable both readings: current at 0,480, landing at 100,480, size 3.5, white RGB, tint 100. Existing saved preferences take priority; see DEFAULTS.md. Commands persist through DESRU's existing mechanism: independent enable flags, RGB colors and X/Y coordinates, shared size control. `SpeedometerPositionsVersion` records a one-time upgrade: if old positions are identical, landing X is shifted right by `ceil(160 × size)` pixels. Already different positions are preserved. Later identical positions are allowed and persist. DESRU must be running to apply and save commands. Close any older DESRU instance before starting this build. Normal DESRU launch advice still applies: start the utility before the game.
 
 The left reading is **current horizontal speed**, `sqrt(vx² + vy²)`, in the same m/s units as the existing trainer. The right retains the **horizontal landing impulse**, including the brief acceleration when falling onto a surface with horizontal movement. It captures the first contact speed and the maximum of the next 8 ms, allowing contact and velocity to be published in adjacent physics steps. Later walking acceleration and deceleration do not change it. Both numbers have **two decimal places**, without captions or unit suffixes. `--` means no landing has been observed since attaching/loading. Readings are hidden while loading, outside gameplay, unfocused, or when velocity cannot be read.
 
@@ -135,3 +135,8 @@ Equal per-reading values appear once; different ones are labeled current/landing
 ## Adaptive version support
 
 Native meters, console commands and both low-health layers are live-confirmed on 1.1 and Steam 6.66 Rev 3.2. Read-only resolution also passed on 1.0; live validation on 1.0 is pending. The older 1.1-only address table above is historical reference. NativeGameLayout resolves each installed executable and refuses unresolved or ambiguous layouts. Unknown versions are not guaranteed supported. See implementation report section 15. Current validation: 151 publication checks and seven restart checks.
+
+
+## Startup and live control updates
+
+The native HUD now waits for game console/font initialization and retries transient startup failures. Either startup order is supported. Cheats and Meath00k toggle together through one direct button. Their cvar changes restore without resetting initial preferences; active command flags appear in smaller text under DESRU modifiers. See LIVE-CHEATS.md.

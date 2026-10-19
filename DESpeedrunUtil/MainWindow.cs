@@ -298,6 +298,7 @@ namespace DESpeedrunUtil {
 
             /** Trainer **/
             UpdateSpeedOverlays();
+            UpdateLiveCheatsButton();
             var (velX, velY, velZ, hVel, totalVel) = Memory.GetPlayerVelocity();
             bool showDuringLoads = !Memory.IsLoadingOrInMenu() || !hideDuringLoadsCheckbox.Checked;
             if(Memory.GetFlag("meath00k") || Memory.EnableCheats) {
@@ -1034,16 +1035,14 @@ namespace DESpeedrunUtil {
             Memory.SetFlag(_fwRuleExists, "firewall");
             var gamePath = GameProcess.MainModule.FileName;
             var gameDir = gamePath[..gamePath.LastIndexOf('\\')];
-            bool meath00k = CheckForMeathookInPath(gameDir);
+            bool meath00k = false;
             foreach(ProcessModule module in GameProcess.Modules) {
                 if(module.ModuleName.ToLower().Contains("xinput1_3.dll") && module.FileName.ToLower().Contains(gameDir.ToLower()))
                     meath00k = true;
             }
             Memory.SetFlag(meath00k, "meath00k");
-            cheatsToggleButton.Enabled = !meath00k;
-            if(!meath00k) {
-                cheatsToggleButton.Text = "Enable Cheats";
-            }
+            cheatsToggleButton.Enabled = true;
+            cheatsToggleButton.Text = "Cheats / Meath00k";
             var checksum = Checksums.GetMD5ChecksumFromFile(gamePath);
             if(checksum != "UWP" && !Checksums.Compare(checksum, Memory.Version.MD5)) {
                 var rev3 = GameVersion.GetVersionByName("6.66 Rev 3");
@@ -1259,7 +1258,8 @@ namespace DESpeedrunUtil {
             toolTip7500.SetToolTip(firewallToggleButton, "Toggle a firewall rule blocking DOOM Eternal's connection\n" +
                 "This prevents server side balance updates from being downloaded\n" +
                 "Required to be enabled for Leaderboard Runs");
-            toolTip7500.SetToolTip(cheatsToggleButton, "Enables cheats if the game is running\n" +
+            toolTip7500.SetToolTip(cheatsToggleButton, "Enables or disables Cheats and Meath00k together while the game is running\n" +
+                "Disabling restores protected cvars changed while enabled and preserves initial settings\n" +
                 "Installs or Uninstalls meath00k if the game is closed\n" +
                 "Required to be disabled for Leaderboard Runs");
 

@@ -1,4 +1,4 @@
-namespace DESpeedrunUtil.Overlay {
+﻿namespace DESpeedrunUtil.Overlay {
     internal static class LowHealthTintCode {
         internal const int LeaseOffset = 192, ScaleOffset = 196;
 

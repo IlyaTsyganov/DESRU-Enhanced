@@ -1,4 +1,4 @@
-using DESpeedrunUtil.Memory;
+﻿using DESpeedrunUtil.Memory;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -19,6 +19,14 @@ namespace DESpeedrunUtil.Overlay {
         internal const int ModuleSize11 = 492113920;
         internal bool CommandsRegistered => _game.ReadValue<int>(_state + 4) == 3;
         internal long RenderCount => _game.ReadValue<long>(_state + 8);
+        internal NativeHudExtension Extension { get; private set; } = null!;
+        internal NativeGameLayout Layout => _layout;
+        internal float GlyphWidth => CurrentGlyph(_layout.GlyphWidth, _glyphWidth);
+        internal float GlyphHeight => CurrentGlyph(_layout.GlyphHeight, _glyphHeight);
+        private float CurrentGlyph(int offset, float fallback) {
+            float value = _game.ReadValue<float>(_game.MainModule!.BaseAddress + offset, fallback);
+            return float.IsFinite(value) && value > 0 && value <= 1000 ? value : fallback;
+        }
 
         private NativeSpeedometer(Process game, IntPtr state, NativeGameLayout layout) {
             _game = game; _state = state;
@@ -28,16 +36,20 @@ namespace DESpeedrunUtil.Overlay {
             _glyphHeight = game.ReadValue<float>(game.MainModule.BaseAddress + layout.GlyphHeight);
             if(!float.IsFinite(_glyphWidth) || _glyphWidth <= 0 || _glyphWidth > 1000 ||
                 !float.IsFinite(_glyphHeight) || _glyphHeight <= 0 || _glyphHeight > 1000)
-                throw new InvalidOperationException("Cannot read game font metrics");
+                throw new NativeGameNotReadyException("Game font metrics are not initialized yet");
             // Saved user settings are authoritative on reconnect; do not replay old console requests.
             for(int i = 0; i < _sequences.Length; i++) _sequences[i] = game.ReadValue<int>(state + 0x400 + i * 0x80);
+            Extension = new NativeHudExtension(game, state, layout);
         }
 
         internal static NativeSpeedometer Attach(Process game) {
             var layout = NativeGameLayout.Resolve(game.MainModule!.FileName);
             if(game.MainModule.ModuleMemorySize != layout.ImageSize) throw new NotSupportedException("On-disk and loaded game images differ");
             IntPtr image = game.MainModule.BaseAddress, slot = image + layout.HudSlot;
-            if(!game.ReadPointer(slot, true, out var original)) throw new InvalidOperationException("Cannot read HUD renderer");
+            var ready = RequireReady(game, image + layout.CommandGlobal, image + layout.GlyphWidth, image + layout.GlyphHeight);
+            if(!game.ReadPointer(slot, true, out var original) || original == IntPtr.Zero) throw new NativeGameNotReadyException("The game HUD renderer is not initialized yet");
+            slot = LiveMeathook.UnwrapHud(game, slot, original);
+            if(!game.ReadPointer(slot, true, out original)) throw new InvalidOperationException("Cannot read chained HUD renderer");
             IntPtr previousState = IntPtr.Zero;
             if(original != image + layout.Render) {
                 // Reconnect after DESRU restarted. Code/data remain alive for the lifetime of the game.
@@ -52,15 +64,12 @@ namespace DESpeedrunUtil.Overlay {
                     }
                     // Upgrade earlier coordinate adapters without freeing their registered
                     // command callbacks. Reuse their mailboxes; replace only the aligned render slot.
-                    if(magic == "DESRUS02" || magic == "DESRUS03" || magic == "DESRUS04" || magic == "DESRUS05" || magic == "DESRUS06") previousState = state;
+                    if(magic == "DESRUS02" || magic == "DESRUS03" || magic == "DESRUS04" || magic == "DESRUS05" || magic == "DESRUS06" || magic == "DESRUS07") previousState = state;
                 }
                 if(previousState == IntPtr.Zero) throw new NotSupportedException("Another HUD renderer hook is installed; it was left unchanged");
             }
             foreach(int code in new[] { layout.Render, layout.Draw, layout.Width, layout.Height, layout.Print }) VerifyFileCode(game, code);
-            if(!game.ReadPointer(image + layout.CommandGlobal, true, out var commandSystem) || commandSystem == IntPtr.Zero ||
-                !game.ReadPointer(commandSystem, true, out var commandVtable) ||
-                !game.ReadPointer(commandVtable + 24, true, out var addCommand) || addCommand == IntPtr.Zero)
-                throw new InvalidOperationException("Cannot resolve the game command system");
+            IntPtr commandSystem = ready.System, addCommand = ready.AddCommand;
             IntPtr allocation = game.AllocateMemory(8192);
             if(allocation == IntPtr.Zero) throw new InvalidOperationException("Cannot allocate the HUD adapter");
             bool installed = false;
@@ -81,6 +90,7 @@ namespace DESpeedrunUtil.Overlay {
                 if(previousState != IntPtr.Zero) {
                     // Quiesce drawing and initialize the new viewport fields before publishing code.
                     game.WriteBytes(state, new byte[4]);
+                    game.WriteBytes(state + NativeHudExtension.PointerOffset, new byte[8]);
                     game.WriteBytes(state + 56, data.AsSpan(56, 8).ToArray());
                     game.WriteBytes(state + 384, data.AsSpan(384, 32).ToArray());
                     if(!game.WriteBytes(state + NativeSpeedometerCode.ConsoleReadyOffset, data.AsSpan(NativeSpeedometerCode.ConsoleReadyOffset, 592).ToArray()))
@@ -95,6 +105,7 @@ namespace DESpeedrunUtil.Overlay {
                 try { installed = game.WriteBytes(slot, BitConverter.GetBytes(allocation.ToInt64())); }
                 finally { game.VirtualProtect(slot, 8, previous); }
                 if(!installed) throw new InvalidOperationException("Cannot attach the HUD adapter");
+                LiveMeathook.SynchronizeHudBridge(game, image + layout.HudSlot, slot, allocation);
                 if(previousState != IntPtr.Zero) {
                     game.WriteBytes(state + 48, Encoding.ASCII.GetBytes(NativeSpeedometerCode.Magic));
                 }
@@ -102,6 +113,23 @@ namespace DESpeedrunUtil.Overlay {
             } finally {
                 if(!installed) game.FreeMemory(allocation);
             }
+        }
+
+        internal static (IntPtr System, IntPtr AddCommand) RequireReady(Process game, IntPtr commandGlobal, IntPtr glyphWidth, IntPtr glyphHeight) {
+            // These globals are initially empty when DESRU sees the process before
+            // engine startup. Do not allocate/register a HUD until they are usable.
+            if(!game.ReadPointer(commandGlobal, true, out var system) || system == IntPtr.Zero ||
+                !game.ReadPointer(system, true, out var vtable) || vtable == IntPtr.Zero ||
+                !game.ReadPointer(vtable + 24, true, out var addCommand) || addCommand == IntPtr.Zero ||
+                !game.ReadPointer(system + 16, true, out var registry) || registry == IntPtr.Zero ||
+                !game.ReadBytes(registry, 16, out var header) || BitConverter.ToInt64(header) == 0 ||
+                BitConverter.ToInt32(header, 8) < 1 || BitConverter.ToInt32(header, 8) > 65536 ||
+                BitConverter.ToInt32(header, 12) < BitConverter.ToInt32(header, 8))
+                throw new NativeGameNotReadyException("The game command system is not initialized yet");
+            if(!game.ReadValue<float>(glyphWidth, out var width) || !game.ReadValue<float>(glyphHeight, out var height) ||
+                !float.IsFinite(width) || width <= 0 || width > 1000 || !float.IsFinite(height) || height <= 0 || height > 1000)
+                throw new NativeGameNotReadyException("Game font metrics are not initialized yet");
+            return (system, addCommand);
         }
 
         internal static byte[] CreateState() {
@@ -156,13 +184,13 @@ namespace DESpeedrunUtil.Overlay {
             if(_tintAttached) _tintTarget.Update(_state, player);
             BitConverter.GetBytes(_tintAttachFailed ? 0 : 240).CopyTo(tint, 0);
             BitConverter.GetBytes((float) (_tintAttachFailed ? 1 : lowHpTintOpacity / 100)).CopyTo(tint, 4);
-            byte[] readings = CreateReadings(current, landing, _glyphWidth);
+            byte[] readings = CreateReadings(current, landing, GlyphWidth);
             if(!SpeedometerOverlay.TryGetPhysicalViewport(_game.MainWindowHandle, out var viewport)) viewport = new Rectangle(0, 0, 1920, 1080);
             byte[] dimensions = new byte[8];
             BitConverter.GetBytes((float) viewport.Width).CopyTo(dimensions, 0);
             BitConverter.GetBytes((float) viewport.Height).CopyTo(dimensions, 4);
             if(!_game.WriteBytes(_state + LowHealthTintCode.LeaseOffset, tint) ||
-                !_game.WriteBytes(_state + 20, BitConverter.GetBytes(_glyphHeight)) || !_game.WriteBytes(_state + 64, readings) ||
+                !_game.WriteBytes(_state + 20, BitConverter.GetBytes(GlyphHeight)) || !_game.WriteBytes(_state + 64, readings) ||
                 !_game.WriteBytes(_state + 384, CreateColors(current, landing)) ||
                 !_game.WriteBytes(_state + 56, dimensions) ||
                 !_game.WriteBytes(_state, BitConverter.GetBytes(current.Enabled || landing.Enabled ? 240 : 0)))
@@ -233,6 +261,7 @@ namespace DESpeedrunUtil.Overlay {
         }
 
         public void Dispose() {
+            Extension.Dispose();
             try {
                 if(!_game.HasExited) {
                     _game.WriteBytes(_state + LowHealthTintCode.LeaseOffset, new byte[4]);

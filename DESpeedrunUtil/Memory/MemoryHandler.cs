@@ -58,6 +58,7 @@ namespace DESpeedrunUtil.Memory {
         }
         public bool FirstRun { get; set; } = true;
         public bool EnableOSD { get; set; } = false;
+        internal bool MinimalOSD => _minimalOSD;
         public bool EnableCheats { get; set; } = false;
         public bool PotentiallyModdedUWP { get; private set; } = false;
         System.Timers.Timer _restartCheatsTimer;
@@ -72,7 +73,7 @@ namespace DESpeedrunUtil.Memory {
              _trainerFlag = false, _externalTrainerFlag = false, _scheduleScaling = false,
              _antiAliasing = true, _unDelay = true, _autoContinue = false,
              _minimalOSD = false;
-        string _row1, _row2, _row3, _row4, _row5, _row6, _row7, _row8, _row9, _cpu, _gpuV, _gpuN;
+        string _row1, _row2, _row3, _row4, _row5, _row6, _row7, _row8, _row9, _cpu, _gpuN;
         string _cheatString = "CHEATS ENABLED", _scrollString = "", _resetRunString = "";
         int _fpsLimit = 250, _targetFPS = 1000;
         float _minRes = 0.01f;
@@ -187,7 +188,7 @@ namespace DESpeedrunUtil.Memory {
             if(CheckNonZeroPtr(_advConsolePtr) && _game.ReadValue<bool>(_advConsolePtr) != advkp)
                 _game.WriteBytes(_advConsolePtr, new byte[1] { Convert.ToByte(advkp) });
 
-            _row1 = _row2 = _row3 = _row4 = _row5 = _row6 = _row7 = _row8 = _row9 = _cpu = _gpuV = _gpuN = "";
+            _row1 = _row2 = _row3 = _row4 = _row5 = _row6 = _row7 = _row8 = _row9 = _cpu = _gpuN = "";
             _row1 = METRICS_FPS_TEXT + ((_osdFlagOutOfDate) ? "*" : "");
 
             if(!EnableOSD && !_osdReset) {
@@ -508,8 +509,7 @@ namespace DESpeedrunUtil.Memory {
                 _game.WriteBytes(_cpuPtr, ToByteArray(_cpu, 64));
             }
             if(CheckNonZeroPtr(_gpuVendorPtr)) {
-                _game.VirtualProtect(_gpuVendorPtr, 1024, MemPageProtect.PAGE_READWRITE);
-                _game.WriteBytes(_gpuVendorPtr, ToByteArray(_gpuV, 64));
+                PerformanceMetricsDriverName.Hide(_game, _gpuVendorPtr);
             }
             if(CheckNonZeroPtr(_gpuNamePtr)) {
                 _game.VirtualProtect(_gpuNamePtr, 1024, MemPageProtect.PAGE_READWRITE);

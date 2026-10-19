@@ -1,4 +1,4 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.IO.MemoryMappedFiles;
 using System.Reflection.PortableExecutable;
 using System.Text;
@@ -9,6 +9,9 @@ namespace DESpeedrunUtil.Overlay {
         int Print, int CommandGlobal, int GlyphWidth, int GlyphHeight, int GroundPlaneFromVelocity) {
         public NativeTintLayout? Tint { get; init; }
         public string? TintFailure { get; init; }
+        public NativeCvarLayout? Cvars { get; init; }
+        public int[] PlayerCheatSetters { get; init; } = Array.Empty<int>();
+        public NativePlayerCheatLayout? PlayerCheats { get; init; }
         private static readonly Dictionary<string, NativeGameLayout> Cache = new();
         internal static NativeGameLayout Resolve(string path) {
             var file = new FileInfo(path);
@@ -170,6 +173,24 @@ namespace DESpeedrunUtil.Overlay {
                 return offsets.Length == 0 ? null : Unique(offsets, type + "." + field);
             }
             private int Field(string type, string field) => TryField(type, field) ?? throw new NotSupportedException("Missing metadata: " + type + "." + field);
+            private int PropertyAccessor(string type, string field, bool setter) {
+                var found = new List<int>();
+                foreach(int name in Find(Encoding.ASCII.GetBytes(type + "\0")))
+                    foreach(int reference in Find(BitConverter.GetBytes(_base + Rva(name)))) {
+                        try {
+                            int fields = Offset(checked((int) (Long(reference + 32) - _base)));
+                            for(int i = 0; i < 4096; i++) {
+                                int at = fields + i * 72;
+                                if(Long(at + 16) == 0) break;
+                                if(Text(Long(at + 16)) != field) continue;
+                                int accessor = checked((int) (Long(at + (setter ? 56 : 48)) - _base));
+                                if(IsCode(accessor)) found.Add(accessor);
+                            }
+                        } catch(Exception e) when(e is NotSupportedException or ArgumentOutOfRangeException or OverflowException) { }
+                    }
+                return Unique(found, type + "." + field + (setter ? " setter" : " getter"));
+            }
+            private NativePlayerCheatFlag PlayerCheatFlag(string field) => NativePlayerCheatFlag.Decode(Bytes.Slice(Offset(PropertyAccessor("idPlayer", field, false)), 16));
             private int EnumValue(string type, string value) {
                 var found = new List<int>();
                 foreach(int name in Find(Encoding.ASCII.GetBytes(type + "\0"))) {
@@ -226,6 +247,19 @@ namespace DESpeedrunUtil.Overlay {
                     throw new NotSupportedException("Resolved game layout contains invalid code or data addresses");
                 try { layout = layout with { Tint = ResolveTint() }; }
                 catch(NotSupportedException e) { layout = layout with { TintFailure = e.Message }; }
+                try {
+                    layout = layout with { Cvars = new NativeCvarLayout(
+                        layout.CommandGlobal + Field("engine_t", "cvarSystemForTransfer") - Field("engine_t", "cmdSystemForTransfer"),
+                        Unique(Metadata("idCVar::cvarData_t").Select(m => m.Size), "cvar data size"),
+                        Field("idCVar::cvarData_t", "valueString"), Field("idCVar::cvarData_t", "valueInteger"), Field("idCVar::cvarData_t", "valueFloat"),
+                        Field("idCVar::cvarData_t", "name"), Field("idCVar::cvarData_t", "resetString"), Field("idCVar::cvarData_t", "flags"),
+                        EnumValue("cvarFlags_t", "CVAR_CHEAT"), EnumValue("cvarFlags_t", "CVAR_NOCHEAT"),
+                        EnumValue("cvarFlags_t", "CVAR_ROM"), EnumValue("cvarFlags_t", "CVAR_INIT"), EnumValue("cvarFlags_t", "CVAR_SHIPPINGDISABLED")) };
+                } catch(NotSupportedException) { /* Cvar monitoring is independent of the existing HUD features. */ }
+                try { layout = layout with { PlayerCheatSetters = new[] { PropertyAccessor("idPlayer", "noClip", true), PropertyAccessor("idPlayer", "noTarget", true), PropertyAccessor("idPlayer", "godMode", true) } }; }
+                catch(NotSupportedException) { }
+                try { layout = layout with { PlayerCheats = new(PlayerCheatFlag("noClip"), PlayerCheatFlag("noTarget"), PlayerCheatFlag("godMode")) }; }
+                catch(NotSupportedException) { }
                 return layout;
             }
             public void Dispose() {
