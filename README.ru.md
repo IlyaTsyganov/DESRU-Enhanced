@@ -2,7 +2,7 @@
 
 [English](README.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Русский](README.ru.md)
 
-Неофициальная Windows-утилита для DOOM Eternal на основе [DESRU 1.6.17 от bowsr](https://github.com/bowsr/DESRU). Версию поддерживает IlyaTsyganov. Исходная история Git и авторство сохранены.
+Неофициальная Windows-утилита для DOOM Eternal на основе [DESRU 1.6.17 от bowsr](https://github.com/bowsr/DESRU). Исходная история Git и авторство сохранены.
 
 ## Установка
 
