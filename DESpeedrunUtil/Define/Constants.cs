@@ -45,9 +45,9 @@
         internal const string LAUNCHPARAMS_GLOBAL_U = "4183C91053EB0390EBF64883EC50488B842488000000488B";
 
         internal const int MAX_SCROLL_DELTA = 200; // Max milliseconds between scroll inputs
-        internal const int WINDOW_HEIGHT_DEFAULT = 805;
+        internal const int WINDOW_HEIGHT_DEFAULT = 832;
         internal const int WINDOW_WIDTH_DEFAULT = 653;
-        internal const int PANEL_HEIGHT_DEFAULT = 760;
+        internal const int PANEL_HEIGHT_DEFAULT = 787;
         internal const int WINDOW_EXTRAHEIGHT_MOREKEYS = 271; // Amount to add/subtract when showing/hiding extra fps hotkeys
         internal const int PANEL_EXTRAHEIGHT_MOREKEYS = 269;
         internal const int WINDOW_EXTRAWIDTH = 12;

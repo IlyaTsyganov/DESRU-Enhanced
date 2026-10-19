@@ -30,6 +30,7 @@ namespace DESpeedrunUtil {
         }
 
         private void ReleaseSpeedOverlays() {
+            ReleaseVisualFeatures();
             Memory?.StopSpeedSampler();
             _nativeSpeedometer?.Dispose();
             _nativeSpeedometer = null;
@@ -196,6 +197,7 @@ namespace DESpeedrunUtil {
             } finally {
                 _switchingCheats = false;
                 UpdateLiveCheatsButton();
+                UpdateVisualFeatures();
             }
         }
     }

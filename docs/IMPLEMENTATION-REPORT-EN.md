@@ -376,7 +376,7 @@ Investigation used the local executable's type tables and meath00k reference sou
 
 ## Publication notes
 
-The public fork disables upstream automatic update checks by default (`EnableUpstreamUpdates=False`) so an upstream update cannot replace these enhancements. Download fork releases manually. The release is an update archive for an existing official DESRU 1.6.17 installation; it does not redistribute game fonts, meath00k, or the freescroll executable. Source builds use the original project dependencies. Local paths, user profiles, logs, private continuation context, and PDBs are excluded.
+The public fork disables upstream automatic update checks by default (`EnableUpstreamUpdates=False`) so an upstream update cannot replace these enhancements. Download fork releases manually. Earlier releases were update archives for an existing official DESRU 1.6.17 installation. Starting with v1.1.0, a complete self-contained Windows x64 archive includes the original required fonts, meath00k and freescroll components unchanged, with their original ownership/notices retained. See [standalone packaging](STANDALONE.md) and [current validation](RELEASE-VALIDATION.md). Source builds use the original project dependencies. Local paths, user profiles, logs, private continuation context, and PDBs are excluded.
 
 ## 14. Console command queries (DESRUS07)
 

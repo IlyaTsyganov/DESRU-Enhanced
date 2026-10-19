@@ -73,6 +73,7 @@ namespace DESpeedrunUtil {
             RawInputDevice.RegisterDevice(HidUsageAndPage.Mouse, RawInputDeviceFlags.InputSink, this.Handle);
 
             InitializeComponent();
+            InitializeVisualFeatures();
             _hotkeyFields = new();
             _fpsLimitFields = new();
             _openProcesses = new();
@@ -250,7 +251,7 @@ namespace DESpeedrunUtil {
 
             /** Memory Flags **/
             var v = Memory.Version.Name.Contains("Unknown");
-            if(!_fwRuleExists) Memory.SetFlag(false, "firewall");
+            Memory.SetFlag(_fwRuleExists, "firewall");
             Memory.SetFlag(_enableMacro && FreescrollMacro.Instance.HasKeyBound(), "macro");
             Memory.SetFlag(!v && enforce250FPSCheckbox.Checked, "limiter");
             Memory.SetFlag(trainerOSDCheckbox.Checked, "trainer");
@@ -298,6 +299,7 @@ namespace DESpeedrunUtil {
 
             /** Trainer **/
             UpdateSpeedOverlays();
+            UpdateVisualFeatures();
             UpdateLiveCheatsButton();
             var (velX, velY, velZ, hVel, totalVel) = Memory.GetPlayerVelocity();
             bool showDuringLoads = !Memory.IsLoadingOrInMenu() || !hideDuringLoadsCheckbox.Checked;
@@ -361,6 +363,7 @@ namespace DESpeedrunUtil {
 
         // Timer method used to update the info panel on the main form
         private void StatusTick() {
+            UpdateVisualFeatures();
             _openProcesses = Process.GetProcesses().ToList();
             var rtss = _openProcesses.FindAll(p => p.ProcessName.ToLower().Contains("rtss")).Count > 0;
             if(!rtss && launchRTSSCheckbox.Enabled && launchRTSSCheckbox.Checked) LaunchRTSS();
@@ -368,11 +371,7 @@ namespace DESpeedrunUtil {
             // Checking for the Firewall rule can take upwards of 8ms
             // so it was moved out of the main timer and into this one since the interval is longer, for better performance
             try {
-                if(Hooked && !GameProcess.MainModule.FileName.Contains("WindowsApps")) {
-                    _fwRuleExists = FirewallHandler.CheckForFirewallRule(GameProcess.MainModule.FileName, false);
-                } else {
-                    _fwRuleExists = FirewallHandler.CheckForFirewallRule(_gameDirectory + "\\DOOMEternalx64vk.exe", false);
-                }
+                RefreshFirewallStatus();
             } catch(Exception e) {
                 Log.Error(e, "Failed to check if firewall rule exists.");
             }
@@ -995,7 +994,7 @@ namespace DESpeedrunUtil {
             _ghostIDsChecked.Clear();
             Log.Information("Starting to hook into the DOOMEternalx64vk.exe process. firstRun={FirstRun}", _firstRun);
 
-            _fwRuleExists = FirewallHandler.CheckForFirewallRule(GameProcess.MainModule.FileName, false);
+            _fwRuleExists = FirewallHandler.CheckForFirewallRule(GameProcess.MainModule.FileName);
             _reshadeExists = CheckForReShade();
 
             try {
@@ -1060,13 +1059,11 @@ namespace DESpeedrunUtil {
             }
             Memory.SetFlag(_reshadeExists, "reshade");
             Memory.SetFlag(Program.UpdateDetected, "outofdate");
-            Memory.SetFlag(_firstRun && !Memory.GetFlag("meath00k"), "restart");
             Memory.FirstRun = _firstRun;
             Memory.EnableOSD = enableOSDCheckbox.Checked;
             Memory.UseDynamicScaling = dynScalingRadioButton.Checked;
             Memory.SetFlag(!Memory.Version.Name.Contains("Unknown") && enforce250FPSCheckbox.Checked, "limiter");
             Memory.SetFlag(minimalOSDCheckbox.Checked, "minimal");
-            if(Memory.GetFlag("restart")) Log.Warning("Game requires a restart. Utility must be running before the game is launched.");
             Memory.SetMinRes(_minResPercent / 100f);
             if(unlockOnStartupCheckbox.Checked) {
                 Memory.ScheduleResUnlock(autoScalingCheckbox.Checked, _targetFPS);
@@ -1095,8 +1092,8 @@ namespace DESpeedrunUtil {
                 File.WriteAllText(dir + "\\gameVersion.txt", "version=" + Memory.Version.Name);
             }
 
-            if(!gamePath.Contains(_gameDirectory) || !(gamePath.Contains(_gameDirectory) && gamePath.Equals(_gameDirectory))) {
-                if(!_extraGameDirectories.Contains(dir)) {
+            if(!string.Equals(dir, _gameDirectory, StringComparison.OrdinalIgnoreCase)) {
+                if(!_extraGameDirectories.Contains(dir, StringComparer.OrdinalIgnoreCase)) {
                     _extraGameDirectories.Add(dir);
                     FirewallHandler.CreateFirewallRule(gamePath, _extraGameDirectories.Count);
                 }
@@ -1281,6 +1278,7 @@ namespace DESpeedrunUtil {
         }
 
         private void SetFonts() {
+            SetVisualFeatureFonts();
             // Eternal UI 2 Regular 11.25point
             foreach(Control c in _hotkeyFields) c.Font = EternalUIRegular;
             foreach(Control c in _fpsLimitFields) c.Font = EternalUIRegular;

@@ -2,6 +2,8 @@
 
 When the game is running, **Enable Cheats / Meath00k** enables console cheats and loads the bundled mod together with one click. The button then offers **Disable Cheats / Meath00k**, which restores changed cvars, restores the mod's game patches and makes its registered commands inactive. There is no context menu. The button is disabled while switching, and repeated clicks during that operation are ignored. The game stays open throughout.
 
+The top-right cheat indicator reflects the current state: `CHEATS ENABLED` for enabled cheats, `MEATH00K` for the mod alone, and no cheat text when both are off. The old persistent `RESTART GAME` message has been removed, including when DESRU starts after the game. Other indicators, such as `MODDED CLIENT`, are unchanged.
+
 When the game is closed, the existing install/uninstall action for the startup proxy remains available. A verified bundled startup proxy already loaded by the game can also be adopted by live control. Disabling a session does not remove the installed proxy from disk; uninstall it with the game closed if it should not load on the next launch.
 
 ## Cvar display and restoration

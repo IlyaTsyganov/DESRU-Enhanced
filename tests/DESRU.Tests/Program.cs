@@ -1,4 +1,4 @@
-﻿using DESpeedrunUtil.Memory;
+using DESpeedrunUtil.Memory;
 using DESpeedrunUtil.Overlay;
 using System.Reflection;
 using System.Diagnostics;
@@ -14,6 +14,25 @@ internal static class Program {
     [STAThread]
     private static int Main(string[] args) {
         try {
+            if(args.Length==2&&args[0]=="--visual-depth-test") {
+                VisualDepthDiagnostic.Run(args[1]);return 0;
+            }
+            if(args.Contains("--live-visual-lighting")||args.Contains("--live-visual-viewer")) {
+                LiveVisualTests.Run(args.Contains("--live-visual-viewer"),Check).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {_checks} live visual feature checks");return 0;
+            }
+            if(args.Length==2&&args[0]=="--preview-visual-options") {
+                ApplicationConfiguration.Initialize();
+                VisualFeatureTests.Preview(Path.GetFullPath(args[1]));return 0;
+            }
+            if(args.Length==2&&args[0] is "--preview-help-osd" or "--preview-help-other" or "--preview-help-info") {
+                ApplicationConfiguration.Initialize();HelpScrollingTests.Preview(Path.GetFullPath(args[1]),args[0].Replace("--preview-help-",""));return 0;
+            }
+            if(args.Contains("--test-firewall")) {
+                FirewallToggleTests.Run(Check);
+                Console.WriteLine($"PASS: {_checks} isolated Windows firewall and wired button checks");
+                return 0;
+            }
             if(args.Contains("--inspect-player-cheats")) {
                 using var game = Process.GetProcessesByName("DOOMEternalx64vk").Single();
                 var layout = NativeGameLayout.Resolve(game.MainModule!.FileName);
@@ -146,7 +165,24 @@ internal static class Program {
                 var section = (System.Configuration.ClientSettingsSection) config.GetSection("userSettings/DESpeedrunUtil.Properties.Settings");
                 Check(section.Settings.Get("SpeedometersEnabled")?.Value.ValueXml.InnerText == "True", "Packaged settings load through the real .NET configuration parser");
                 Check(section.Settings.Get("CurrentSpeedOverlayColor")?.Value.ValueXml.InnerText == "White" && section.Settings.Get("LandingSpeedOverlayColor")?.Value.ValueXml.InnerText == "White", "Packaged RGB defaults deserialize");
-                Console.WriteLine("PASS: startup package file and runtime configuration checks");
+                Check(config.AppSettings.Settings["EnableUpstreamUpdates"]?.Value == "False", "Standalone cannot silently replace the fork with an upstream update");
+                foreach(string application in new[] { "DESRU", "Updater" }) {
+                    using var runtime = System.Text.Json.JsonDocument.Parse(File.ReadAllText(application + ".runtimeconfig.json"));
+                    var options = runtime.RootElement.GetProperty("runtimeOptions");
+                    Check(!options.TryGetProperty("framework", out _) && !options.TryGetProperty("frameworks", out _), application + " has no external framework dependency");
+                    Check(options.GetProperty("includedFrameworks").EnumerateArray().Count(f => f.GetProperty("version").GetString() == "6.0.36") == 2, application + " includes both pinned desktop/runtime frameworks");
+                }
+                foreach(string runtimeFile in new[] { "coreclr.dll", "hostfxr.dll", "hostpolicy.dll", "System.Windows.Forms.dll" })
+                    Check(File.Exists(runtimeFile), "Standalone includes " + runtimeFile);
+                byte[] native = File.ReadAllBytes("visuals/DESRU.Visuals.Runtime.dll");
+                int pe = BitConverter.ToInt32(native, 0x3c);
+                Check(BitConverter.ToUInt16(native, pe + 4) == 0x8664, "Packaged visual module is x64");
+                Check(System.Text.Encoding.ASCII.GetString(native).Contains("DesruVisualsStart") && System.Text.Encoding.ASCII.GetString(native).Contains("DESRUVisualControl"), "Packaged native bridge exports are present");
+                var packagedAssembly = Assembly.LoadFile(Path.GetFullPath("DESRU.dll"));
+                var resources = new System.Resources.ResourceManager("DESpeedrunUtil.Properties.Resources", packagedAssembly);
+                foreach(string name in new[] { "HelpPage_OSD", "HelpPage_InfoPanel", "HelpPage_Other" })
+                    Check(resources.GetString(name) == DESpeedrunUtil.Properties.Resources.ResourceManager.GetString(name) && resources.GetString(name) != null, "Packaged approved help matches tested source: " + name);
+                Console.WriteLine($"PASS: {_checks} startup, self-contained runtime, native module and approved Help package checks");
                 return 0;
             }
             if(args.Contains("--probe-game") || args.Contains("--live-overlay") || args.Contains("--native-overlay"))
@@ -243,6 +279,8 @@ internal static class Program {
             VerifySampler();
 
             ApplicationConfiguration.Initialize();
+            VisualFeatureTests.Run(Check);
+            HelpScrollingTests.Run(Check);
             var output = Path.GetFullPath(args.FirstOrDefault() ?? "artifacts/test-previews");
             Directory.CreateDirectory(output);
             var commandSettings = new Settings();

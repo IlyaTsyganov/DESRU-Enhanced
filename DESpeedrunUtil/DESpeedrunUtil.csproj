@@ -130,4 +130,17 @@
     <Exec Command="rmdir /S /Q &quot;$(TargetDir)&quot;" />
   </Target>
 
+  <Target Name="BuildNativeVisuals" BeforeTargets="BeforeBuild" Condition="'$(SkipNativeVisualBuild)' != 'true'">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\NativeVisuals\build.ps1&quot;" StandardOutputImportance="Low" />
+  </Target>
+  <ItemGroup>
+    <Content Include="..\NativeVisuals\third_party\doomfix\LICENSE" Link="visuals\licenses\doomfix-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\NativeVisuals\third_party\doomfix\THIRD_PARTY_NOTICES.md" Link="visuals\licenses\THIRD_PARTY_NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\NativeVisuals\third_party\Vulkan-Headers\LICENSE.md" Link="visuals\licenses\Vulkan-Headers-LICENSE.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\NativeVisuals\third_party\Vulkan-Headers\LICENSES\*" Link="visuals\licenses\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="CopyNativeVisuals" AfterTargets="Build" Condition="Exists('$(MSBuildProjectDirectory)\..\artifacts\visuals-build\bin\DESRU.Visuals.dll')">
+    <MakeDir Directories="$(TargetDir)visuals" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\..\artifacts\visuals-build\bin\DESRU.Visuals.dll" DestinationFiles="$(TargetDir)visuals\DESRU.Visuals.Runtime.dll" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

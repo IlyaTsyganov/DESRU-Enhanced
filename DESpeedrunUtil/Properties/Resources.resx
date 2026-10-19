@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -125,23 +125,28 @@
     <value>..\Resources\gameVersions.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="HelpPage_InfoPanel" xml:space="preserve">
-    <value>The Info Panel will show you the status of DOOM Eternal and DESRU.
+    <value>The Info Panel shows the status of DOOM Eternal and DESRU.
 
-Starting from the top, this panel will show you what version of DOOM Eternal is currently running.
-Your current FPS limit will be displayed below that.
+Starting from the top, this panel shows which version of DOOM Eternal is currently running.
+Your current FPS limit is displayed below it.
 
-The status of the Freescroll Emulation Macro will also be shown. As a note, you'll see this toggle between Running and Stopped if you tab out of the game.
+The status of the Freescroll Emulation Macro is also shown. You'll see this switch between Running and Stopped when you tab out of the game.
 
-If dynamic resolution scaling is enabled, this panel will display that, along with the current FPS target.
-It will also display if hotkeys are enabled. Like the macro, you'll see this toggle when tabbing out of DOOM.
+If dynamic resolution scaling is enabled, the panel displays its status and current FPS target.
+It also displays whether hotkeys are enabled. Like the macro, their status changes when tabbing out of DOOM Eternal.
 
-The Slopeboosting info shows whether pm_allowRampJumping is set to 0 or 1. This only applies to version 1.0 (Release), as any non-unrestricted category does not allow slopeboosting.
-In order to disable slopeboosting, you'll need to enable the option in your LiveSplit autosplitter settings.
+Slopeboosting shows whether pm_allowRampJumping is set to 0 or 1. This applies to version 1.0 (Release), where non-unrestricted categories do not allow slopeboosting.
+To disable slopeboosting, enable the corresponding option in your LiveSplit autosplitter settings.
 
 Balance Updates refers to the firewall rule. This must say "Blocked" when speedrunning.
-Cheats shows the status of the meath00k dll.
 
-ReShade displays whether ReShade is detected to be running over Vulkan.</value>
+Cheats shows whether cheats or meath00k are active.
+
+ReShade shows whether ReShade is detected to be running over Vulkan.
+
+RTSS shows whether RivaTuner Statistics Server is detected.
+
+Lighting Fix shows the status of DESRU's fix for missing lighting for Nvidia driver version later than 516.94.</value>
   </data>
   <data name="HelpPage_Keybinds" xml:space="preserve">
     <value>In the top left of the main DESRU window, you'll find a section where you can bind various actions to keys.
@@ -196,7 +201,6 @@ In this page you will find a few settings that will toggle cvars in-game, which 
   </data>
   <data name="HelpPage_OSD" xml:space="preserve">
     <value>While DESRU is running, the performance metrics display in the top right of DOOM Eternal will be modified to display the state of a few things.
-This is here to help with the moderation of leaderboard submitted speedruns.
 
 If DESRU is detected to be out of date, an asterisk (*) will be displayed next to the FPS counter. DESRU is required to be up to date during speedruns.
 
@@ -205,12 +209,15 @@ These flags are:
 M - Freescroll Macro Enabled
 F - Firewall Rule Enabled
 R - ReShade Detected
-S - Slopeboosting disabled
+S - Slopeboosting Disabled
 L - Max FPS Limiter Disabled
+X - Lighting Fix Enabled
 
-Finally, under the version, "CHEATS ENABLED" will show if meath00k is detected. If you see "RESTART GAME" here at any point, you need to restart DOOM Eternal in order for runs to be legal. DESRU must be running first before DOOM Eternal is launched, and if the trainer is ever detected, you'll need to restart your game for that, too.
+Under the version, "CHEATS ENABLED" will show while cheats are enabled. "MEATH00K" will show when only meath00k is detected. You need to turn off cheats in order for runs to be legal. Disabling cheats restores tracked cvars to their values from before the cheat session.
 
-On the same line, you'll also see some numbers pop up sometimes. This is your scroll pattern.
+If some protected cvars are changed, they will be displayed below the other indicators in the top right corner. Active noclip, notarget and god modes are also displayed there.
+
+On the same line as "CHEATS ENABLED", you'll also see some numbers pop up sometimes. This is your scroll pattern.
 The numbers show how many times you scrolled your mouse wheel in a single scroll, and the average time between each input.
 
 If you are using any resolution scaling (not DLSS), the current scale and method will show on this line as well.</value>
@@ -267,5 +274,51 @@ If 3.1 is your current version, you can also do the same with your main profile.
   </data>
   <data name="offsets" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\offsets.json;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="HelpPage_Other" xml:space="preserve">
+    <value>COLLISION VIEWER
+
+Collision Viewer is controlled through the console. To use its console commands, you need to turn on cheats.
+
+The viewer draws triggers in cyan, level collision in green and spawnable/despawnable invisible walls in orange.
+
+The commands are:
+desru_volumes_show 0 or 1 (hide/show all volumes; default 0)
+desru_volumes_fill 0 or 1 (outlines only / outlines with fill; default 1)
+desru_triggers_show 0 or 1 (hide/show triggers)
+desru_collision_show 0 or 1 (hide/show level collision)
+desru_invisible_walls_show 0 or 1 (hide/show spawnable/despawnable invisible walls)
+desru_volumes_render_distance &lt;metres&gt; (set the rendering distance; default 40; for example 73.5)
+
+The viewer starts hidden in each game session. Disabling cheats hides it and locks its commands. Fill, category visibility and rendering distance are saved.
+
+Objects are drawn in full when any part of their bounds enters the rendering distance. Hidden internal surfaces are removed during a background calculation, and exposed intersections retain their contour lines. These lines are visible with fill disabled as well.
+
+SPEEDOMETERS
+
+DESRU can display two numeric speed readings through the game's HUD, including in exclusive fullscreen.
+
+The current-speed reading shows your horizontal movement speed. The landing-speed reading retains the horizontal speed captured when you last landed, including the brief landing impulse. Both use metres per second and show two decimal places. "--" means no landing has been recorded yet.
+
+The commands are:
+desru_speedometer_show 0 or 1 (hide/show the speedometer display)
+desru_speedometer_showlanding 0 or 1 (hide/show the landing-speed reading; the main display must also be enabled)
+desru_speedometer_x_pos &lt;pixels&gt; [current|landing] (set the horizontal position from the left edge)
+desru_speedometer_y_pos &lt;pixels&gt; [current|landing] (set the vertical position from the top edge)
+desru_speedometer_size &lt;0.1–10&gt; (set the text size for both readings)
+desru_speedometer_color &lt;R&gt; &lt;G&gt; &lt;B&gt; [current|landing] (set the text color; each channel accepts 0–255)
+
+For position and color commands, use "current" or "landing" to select one reading. Omit this argument to change both. Positions use physical screen pixels. For example:
+desru_speedometer_x_pos 100 landing
+desru_speedometer_color 255 255 255 current
+
+Speedometer preferences are saved while DESRU is running.
+
+LOW-HEALTH TINT
+
+You can adjust the opacity of the red low-health screen effect.
+
+The command is:
+desru_lowhptintopacity &lt;0–100&gt; (set low-health tint opacity; default 100)</value>
   </data>
 </root>
