@@ -2,7 +2,7 @@
 
 [English](README.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Русский](README.ru.md)
 
-Utilitaire Windows non officiel pour DOOM Eternal, dérivé de [DESRU 1.6.17 de bowsr](https://github.com/bowsr/DESRU) et maintenu par IlyaTsyganov. L'historique Git et les crédits d'origine sont conservés.
+Utilitaire Windows non officiel pour DOOM Eternal, dérivé de [DESRU 1.6.17 de bowsr](https://github.com/bowsr/DESRU) L'historique Git et les crédits d'origine sont conservés.
 
 ## Installation
 
