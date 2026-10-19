@@ -1,4 +1,4 @@
-using DESpeedrunUtil.Memory;
+﻿using DESpeedrunUtil.Memory;
 using System.Diagnostics;
 
 namespace DESpeedrunUtil.Overlay {

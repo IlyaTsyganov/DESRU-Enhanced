@@ -1,4 +1,4 @@
-﻿#### This file explains how DESRU works under the hood.
+#### This file explains how DESRU works under the hood.
 
 *If you're looking for instructions on how to use DESRU, click the* **HELP** *button in DESRU. That page will explain basically everything you need to know regarding how to use it.*
 ## Memory
@@ -107,3 +107,10 @@ Having the option stay in the autosplitter allows the user to have it disabled o
 
 ## Low-health red tint
 `desru_lowhptintopacity` (0..100, default 100) scales two separate low-health visual layers: the player screen-FX vignette and `idHUD_LowWarning`'s `lowHealth/backgroundFx` SWF container. A game-thread hook resolves the live display entry every frame and scales both alpha terms while retaining game-side updates. The HUD text, warnings, damage effects, health values and low/critical thresholds are not edited. Dedicated heartbeat expiry restores the captured original alpha even when the speedometers are hidden. Whole-instruction patches are installed with the game briefly suspended, exact signatures and ownership are checked, and registered code remains allocated until game exit. See section 13 of the Russian implementation report for addresses and validation.
+
+
+# Live cheats and protected cvars
+
+The native speedometers wait for the game's console and font initialization when DESRU starts first, and retry temporary startup failures automatically. They do not switch to the desktop font while the supported game is still loading. Current game font metrics are used when updating the numbers.
+
+The running-game Cheats / Meath00k button enables and disables console cheats and the bundled mod together with one click, without restarting DOOM Eternal. Newly changed protected nondefault cvars and active noclip/notarget/god states appear in smaller text below the top-right DESRU modifiers, following the OSD font size and minimal/full layout. Initial preferences remain hidden. Disabling restores only changes made after activation, preserving initial preferences. See [LIVE-CHEATS.md](docs/LIVE-CHEATS.md) for behavior, implementation and validation details.

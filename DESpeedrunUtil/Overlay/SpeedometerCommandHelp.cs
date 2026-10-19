@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Configuration;
 using System.Globalization;
 using Settings = DESpeedrunUtil.Properties.Settings;

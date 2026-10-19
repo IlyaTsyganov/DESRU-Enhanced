@@ -1,4 +1,4 @@
-using DESpeedrunUtil.Memory;
+﻿using DESpeedrunUtil.Memory;
 using DESpeedrunUtil.Overlay;
 using System.Diagnostics;
 using System.Runtime.InteropServices;

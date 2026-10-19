@@ -1,4 +1,4 @@
-using DESpeedrunUtil.Memory;
+﻿using DESpeedrunUtil.Memory;
 using DESpeedrunUtil.Overlay;
 using System.Reflection;
 using System.Diagnostics;
@@ -14,8 +14,98 @@ internal static class Program {
     [STAThread]
     private static int Main(string[] args) {
         try {
+            if(args.Contains("--inspect-player-cheats")) {
+                using var game = Process.GetProcessesByName("DOOMEternalx64vk").Single();
+                var layout = NativeGameLayout.Resolve(game.MainModule!.FileName);
+                GameVersion.Collection = Newtonsoft.Json.JsonConvert.DeserializeObject<List<GameVersion>>(
+                    System.Text.Encoding.UTF8.GetString(DESpeedrunUtil.Properties.Resources.gameVersions))!;
+                var version = GameVersion.GetVersionByModuleSize(game.MainModule.ModuleMemorySize);
+                var playerOffsets = Newtonsoft.Json.JsonConvert.DeserializeObject<List<DESpeedrunUtil.Define.Structs.KnownOffsets>>(
+                    System.Text.Encoding.UTF8.GetString(DESpeedrunUtil.Properties.Resources.offsets))!.Single(o => o.Version == version.Name);
+                IntPtr root = game.ReadPointer(game.MainModule.BaseAddress + playerOffsets.Velocity), slot = game.ReadPointer(root + 0x1510);
+                IntPtr player = game.ReadPointer(slot + (int.TryParse(version.Name[..1], out int major) && major >= 3 ? 0x5c0 : 0x598));
+                var state = new PlayerCheatMonitor(game, layout.PlayerCheats ?? throw new NotSupportedException("Player cheat getters are unavailable")).Read(player);
+                Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new { PlayerAvailable = player != IntPtr.Zero, state.Noclip, state.Notarget, state.God }));
+                return 0;
+            }
+            if(args.Contains("--live-combined-toggle")) {
+                LiveCombinedToggleTests.Run(Check);
+                Console.WriteLine($"PASS: {_checks} live combined button checks");
+                return 0;
+            }
             if(args.Length == 2 && args[0] == "--resolve-game") {
                 Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(NativeGameLayout.Resolve(args[1])));
+                return 0;
+            }
+            if(args.Contains("--inspect-cvars") || args.Contains("--live-meathook-cycle")) {
+                using var game = Process.GetProcessesByName("DOOMEternalx64vk").Single();
+                var layout = NativeGameLayout.Resolve(game.MainModule!.FileName);
+                var monitor = new ProtectedCvarMonitor(game, layout.Cvars ?? throw new NotSupportedException("No cvar layout"));
+                var differences = monitor.Read();
+                Console.WriteLine($"changed protected cvars: {differences.Count}");
+                foreach(var item in differences.Take(60)) Console.WriteLine($"{item.Name} = {item.Value} (default {item.Default})");
+                if(args.Contains("--inspect-cvars")) return 0;
+                using var native = NativeSpeedometer.Attach(game);
+                var runtime = new LiveMeathook(game, native.Extension, layout);
+                var session = new CheatCvarSession(game, native.Extension, monitor);
+                if(runtime.Active && session.Active) {
+                    Console.WriteLine("Restoring the previous interrupted diagnostic session...");
+                    session.RestoreAsync().GetAwaiter().GetResult(); runtime.Disable(); session.End();
+                }
+                Check(!session.Active && !runtime.Active, "Live test starts with cheats and cvar snapshot inactive");
+                var initial = monitor.Read();
+                var initialVolume = initial.Single(c => c.Name == "s_volume");
+                var initialShakes = initial.Single(c => c.Name == "view_skipShakes");
+                session.BeginAsync().GetAwaiter().GetResult();
+                Console.WriteLine("Enabling live Meathook...");
+                runtime.EnableAsync(Path.Combine(Environment.CurrentDirectory, "output/meath00k/XINPUT1_3.dll")).GetAwaiter().GetResult();
+                Check(runtime.Active, "Live Meathook enabled");
+                Console.WriteLine("Meathook attached. Testing cvar action and display...");
+                native.Extension.ExecuteAsync("timescale 0.5").GetAwaiter().GetResult();
+                differences = monitor.Read();
+                Check(differences.Any(c => c.Name == "timescale" && c.Value.StartsWith("0.5")), "Game-thread command changes a protected cvar and is detected");
+                native.Extension.SetCvarAsync("view_skipShakes", "0").GetAwaiter().GetResult();
+                Check(!monitor.Read().Any(c => c.Name == "view_skipShakes"), "Native setter accepts explicit cvar arguments");
+                if(!SpeedometerOverlay.TryGetPhysicalViewport(game.MainWindowHandle, out var cvarViewport)) cvarViewport = new Rectangle(0, 0, 1920, 1080);
+                native.Extension.Update(differences, cvarViewport, 740, 1, native.GlyphWidth, native.GlyphHeight, true);
+                Thread.Sleep(1000);
+                var resumedSession = new CheatCvarSession(game, native.Extension, monitor);
+                Check(resumedSession.Active, "Initial preferences reconnect across DESRU instances");
+                Check(resumedSession.RestoreAsync().GetAwaiter().GetResult() == 2, "Only the two changes made during cheats are restored");
+                Check(!monitor.Read().Any(c => c.Name == "timescale"), "Reset cvar disappears from the changed-values list");
+                Check(monitor.Read().Single(c => c.Name == "view_skipShakes").Value == initialShakes.Value &&
+                    monitor.Read().Single(c => c.Name == "s_volume").Value == initialVolume.Value, "Initial shake and volume settings are preserved");
+                runtime.Disable(); Check(!runtime.Active, "Live Meathook disabled");
+                resumedSession.End();
+                Check(!new CheatCvarSession(game, native.Extension, monitor).Active, "Ended cvar sessions reconnect as inactive");
+                Console.WriteLine("Meathook disabled. Reconnecting and enabling a second time...");
+                var reconnected = new LiveMeathook(game, native.Extension, layout);
+                Check(!reconnected.Active, "Disabled state reconnects from game-owned session data");
+                reconnected.EnableAsync(Path.Combine(Environment.CurrentDirectory, "output/meath00k/XINPUT1_3.dll")).GetAwaiter().GetResult();
+                Check(reconnected.Active, "Meathook re-enabled without rerunning initialization");
+                reconnected.Disable(); Check(!reconnected.Active, "Meathook disabled a second time");
+                Console.WriteLine($"PASS: {_checks} live extension and Meathook checks");
+                return 0;
+            }
+            if(args.Contains("--inspect-driver-name") || args.Contains("--hide-driver-name")) {
+                using var game = Process.GetProcessesByName("DOOMEternalx64vk").Single();
+                GameVersion.Collection = Newtonsoft.Json.JsonConvert.DeserializeObject<List<GameVersion>>(
+                    System.Text.Encoding.UTF8.GetString(DESpeedrunUtil.Properties.Resources.gameVersions))!;
+                var version = GameVersion.GetVersionByModuleSize(game.MainModule!.ModuleMemorySize);
+                var known = Newtonsoft.Json.JsonConvert.DeserializeObject<List<DESpeedrunUtil.Define.Structs.KnownOffsets>>(
+                    System.Text.Encoding.UTF8.GetString(DESpeedrunUtil.Properties.Resources.offsets))!.Single(o => o.Version == version.Name);
+                if(known.GPUVendor == 0) throw new NotSupportedException("No known driver-name offset for this game build");
+                IntPtr inline = game.MainModule.BaseAddress + known.GPUVendor;
+                IntPtr data = game.ReadPointer(inline - 16);
+                Console.WriteLine($"game={version.Name} inlineRva={known.GPUVendor:X} heap={data != inline} name={game.ReadString(data, ReadStringType.ASCII, 64)}");
+                byte[] header = game.ReadBytes(inline - 24, 24), neighbors = game.ReadBytes(inline + 20, 76);
+                if(args.Contains("--hide-driver-name")) {
+                    Check(PerformanceMetricsDriverName.Hide(game, inline), "Live driver name is hidden");
+                    Check(game.ReadValue<byte>(data) == 0, "Live metrics consume an empty driver name");
+                    Check(header.SequenceEqual(game.ReadBytes(inline - 24, 24)) && neighbors.SequenceEqual(game.ReadBytes(inline + 20, 76)),
+                        "Live string header and adjacent driver-version objects remain intact");
+                    Console.WriteLine($"PASS: {_checks} live driver-name checks");
+                }
                 return 0;
             }
             if(args.Contains("--inspect-lowhp") || args.Contains("--trace-lowhp")) {
@@ -95,7 +185,11 @@ internal static class Program {
             var tracker = new HorizontalSpeedTracker();
             Check(!(bool) typeof(DESpeedrunUtil.Program).GetMethod("UpdateCheck", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, null)!, "Fork does not query or install upstream updates by default");
             NativeAdapterTests.Run(Check);
+            NativeStartupTests.Run(Check);
+            CommandDefaultsTests.Run(Check);
             LowHealthTintTests.Run(Check);
+            PerformanceMetricsDriverNameTests.Run(Check);
+            LiveToolsTests.Run(Check);
             var offsets = Newtonsoft.Json.JsonConvert.DeserializeObject<List<DESpeedrunUtil.Define.Structs.KnownOffsets>>(
                 System.Text.Encoding.UTF8.GetString(DESpeedrunUtil.Properties.Resources.offsets))!;
             Check(offsets.Single(o => o.Version == "1.1").GroundPlaneFromVelocity == 136, "Compiled offset resource contains the verified 1.1 contact address");
@@ -154,7 +248,7 @@ internal static class Program {
             var commandSettings = new Settings();
             commandSettings.CurrentSpeedOverlayScale = commandSettings.LandingSpeedOverlayScale = 4;
             string sizeHelp = SpeedometerCommandHelp.Format(commandSettings, 3);
-            Check(sizeHelp == "\"desru_speedometer_size\" is:\"4\" default:\"1\"\nSet text size (0.1 to 10). Always applies to both speedometers.\n", "Bare-command help has the requested two-line format and source defaults instead of saved values");
+            Check(sizeHelp == "\"desru_speedometer_size\" is:\"4\" default:\"3.5\"\nSet text size (0.1 to 10). Always applies to both speedometers.\n", "Bare-command help has the requested two-line format and source defaults instead of saved values");
             commandSettings.CurrentSpeedOverlayX = 400; commandSettings.LandingSpeedOverlayX = 800;
             Check(SpeedometerCommandHelp.Format(commandSettings, 1).Contains("is:\"current=400 landing=800\""), "Independent coordinates are reported without losing either value");
             commandSettings.CurrentSpeedOverlayColor = Color.Red; commandSettings.LandingSpeedOverlayColor = Color.Lime;
@@ -178,6 +272,7 @@ internal static class Program {
             Check(SpeedometerCommands.Apply(commandSettings, 2, "200", "landing") && commandSettings.LandingSpeedOverlayY == 200 && commandSettings.CurrentSpeedOverlayY == 20, "Targeted landing Y preserves current Y");
             Check(SpeedometerCommands.Apply(commandSettings, 1, "400", "") && commandSettings.CurrentSpeedOverlayX == 400 && commandSettings.LandingSpeedOverlayX == 400, "Untargeted X sets both coordinates");
             commandSettings.CurrentSpeedOverlayY = commandSettings.LandingSpeedOverlayY = 600;
+            commandSettings.CurrentSpeedOverlayScale = commandSettings.LandingSpeedOverlayScale = 1;
             commandSettings.SpeedometerPositionsVersion = 0;
             Check(SpeedometerCommands.InitializeIndependentPositions(commandSettings) && commandSettings.CurrentSpeedOverlayX == 400 && commandSettings.LandingSpeedOverlayX == 560, "Old identical positions split once on upgrade");
             commandSettings.LandingSpeedOverlayX = 400;

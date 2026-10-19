@@ -1,0 +1,15 @@
+{
+  "CurrentSpeedOverlayEnabled": "True",
+  "LandingSpeedOverlayEnabled": "True",
+  "CurrentSpeedOverlayX": "0",
+  "CurrentSpeedOverlayY": "480",
+  "LandingSpeedOverlayX": "100",
+  "LandingSpeedOverlayY": "480",
+  "CurrentSpeedOverlayScale": "3.5",
+  "LandingSpeedOverlayScale": "3.5",
+  "SpeedometerPositionsVersion": "1",
+  "LowHpTintOpacity": "100",
+  "SpeedometersEnabled": "True",
+  "CurrentSpeedOverlayColor": "White",
+  "LandingSpeedOverlayColor": "White"
+}
