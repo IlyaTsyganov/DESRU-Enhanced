@@ -6,7 +6,7 @@ Utilitaire Windows non officiel pour DOOM Eternal, dérivé de [DESRU 1.6.17 de 
 
 ## Installation
 
-1. Dans les [Releases](https://github.com/IlyaTsyganov/DESRU-Enhanced/releases/latest), téléchargez **DESRU-Enhanced-v1.1.0-standalone-win-x64.zip** depuis Assets. Les archives « Source code » sont destinées au développement.
+1. Dans les [Releases](https://github.com/IlyaTsyganov/DESRU-Enhanced/releases/latest), téléchargez **DESRU-Enhanced-v1.1.1-standalone-win-x64.zip** depuis Assets. Les archives « Source code » sont destinées au développement.
 2. Sous Windows 10/11 x64, fermez les autres instances de DESRU et extrayez l'archive complète dans un dossier accessible en écriture, avec tous ses sous-dossiers. Sauvegardez votre ancienne installation et vos réglages avant de remplacer des fichiers.
 3. Lancez **DESRU.exe**, acceptez la demande de droits administrateur et sélectionnez le dossier du jeu si nécessaire.
 4. Gardez DESRU ouvert et lancez DOOM Eternal normalement. Les deux programmes peuvent démarrer dans n'importe quel ordre ; aucun lanceur intermédiaire n'est nécessaire.
@@ -15,6 +15,7 @@ L'archive autonome contient le runtime de bureau .NET 6.0.36, les dépendances, 
 
 ## Changements par rapport au DESRU d'origine
 
+- Protection des modbots : maintenir E/Q à l'ouverture ne change plus d'onglet d'arme ; la limite FPS interne reste active. Les nouveaux appuis fonctionnent après relâchement. L'avertissement apparaît uniquement si la protection ne peut pas être activée. [Détails](docs/MODBOT-INPUT.md).
 - Compteurs de vitesse intégrés au HUD, y compris en plein écran exclusif : vitesse horizontale actuelle et vitesse au dernier atterrissage, avec la brève impulsion. Positions et couleurs indépendantes, taille commune, affichage d'atterrissage facultatif.
 - Réglage de l'opacité des deux couches identifiées de la teinte de faible santé, sans modifier santé ou armure.
 - Activation/désactivation des cheats et de meath00k pendant la partie. La désactivation restaure les cvars suivies à leurs valeurs d'avant la session et désactive les cheats du joueur gérés par DESRU. L'ancien avertissement de redémarrage disparaît lorsque les deux sont désactivés.
@@ -62,4 +63,4 @@ Compilation Windows : Visual Studio MSBuild, SDK .NET bureau et outils C++ (CMak
 
 ## Crédits et licence
 
-DESRU original : **bowsr** ; fork : **IlyaTsyganov**. Intégration adaptée du [projet de billymooreq](https://github.com/billymooreq/DoomEternal-v1.1--RTXfix-DrlaCollisionViewer). Le viewer provient du travail d'IlyaTsyganov, utilisé avec son autorisation et non sous une licence MIT générale. meath00k : brongo et contributeurs. Voir [CREDITS](CREDITS.md). DESRU conserve GPL-3.0 ; les composants tiers conservent leurs propres conditions. Non officiel, sans approbation d'id Software/Bethesda.
+DESRU original : **bowsr**. Intégration adaptée du [projet de billymooreq](https://github.com/billymooreq/DoomEternal-v1.1--RTXfix-DrlaCollisionViewer). Le viewer inclut du code utilisé avec l'autorisation de son auteur, et non sous une licence MIT générale. meath00k : brongo et contributeurs. Voir [CREDITS](CREDITS.md). DESRU conserve GPL-3.0 ; les composants tiers conservent leurs propres conditions. Non officiel, sans approbation d'id Software/Bethesda.

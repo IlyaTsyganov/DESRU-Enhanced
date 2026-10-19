@@ -1,8 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net6.0-windows</TargetFramework>
+    <Version>1.1.1</Version>
+    <FileVersion>1.1.1.0</FileVersion>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -10,6 +12,8 @@
     <Platforms>AnyCPU;x64</Platforms>
     <ApplicationManifest>Resources\app.manifest</ApplicationManifest>
     <AssemblyName>DESRU</AssemblyName>
+    <!-- Preserve the settings directory across fork patch releases. File/product versions still identify the release. -->
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
     <ApplicationIcon>Resources\DESRU.ico</ApplicationIcon>
     <StartupObject>DESpeedrunUtil.Program</StartupObject>
     <ProduceReferenceAssembly>False</ProduceReferenceAssembly>

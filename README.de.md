@@ -6,7 +6,7 @@ Ein inoffizielles Windows-Hilfsprogramm für DOOM Eternal, basierend auf [bowsrs
 
 ## Installation
 
-1. Unter [Releases](https://github.com/IlyaTsyganov/DESRU-Enhanced/releases/latest) die Datei **DESRU-Enhanced-v1.1.0-standalone-win-x64.zip** aus Assets herunterladen. „Source code“ enthält nur den Quellcode.
+1. Unter [Releases](https://github.com/IlyaTsyganov/DESRU-Enhanced/releases/latest) die Datei **DESRU-Enhanced-v1.1.1-standalone-win-x64.zip** aus Assets herunterladen. „Source code“ enthält nur den Quellcode.
 2. Unter Windows 10/11 x64 andere DESRU-Instanzen schließen und das gesamte Archiv mit allen Unterordnern in einen beschreibbaren Ordner entpacken. Eine vorhandene Installation und Einstellungen vor dem Ersetzen sichern.
 3. **DESRU.exe** starten, die Administratorabfrage bestätigen und bei Bedarf den Spielordner auswählen.
 4. DESRU geöffnet lassen und DOOM Eternal normal starten. Die Startreihenfolge ist beliebig; ein separater Spielstarter ist nicht erforderlich.
@@ -15,6 +15,7 @@ Das eigenständige Paket enthält die .NET-Desktoplaufzeit 6.0.36, Abhängigkeit
 
 ## Änderungen gegenüber dem ursprünglichen DESRU
 
+- Modbot-Eingabeschutz verhindert, dass gehaltenes E/Q beim Öffnen den Waffenreiter wechselt. Das interne FPS-Limit bleibt aktiv; neue Tastendrücke funktionieren nach dem Loslassen. Die Warnung erscheint nur, wenn der Schutz nicht aktiviert werden kann. [Details](docs/MODBOT-INPUT.md).
 - Geschwindigkeitsanzeigen im nativen HUD, auch im exklusiven Vollbild: aktuelle horizontale Geschwindigkeit und Geschwindigkeit bei der letzten Landung einschließlich des kurzen Landeimpulses. Getrennte Positionen/Farben, gemeinsame Größe, optionale Landeanzeige.
 - Einstellbare Deckkraft beider identifizierter Ebenen der Färbung bei niedriger Gesundheit, ohne Gesundheit oder Rüstung zu verändern.
 - Cheats und meath00k während des Spiels ein-/ausschaltbar. Beim Ausschalten werden überwachte cvars auf ihre Werte vor der Sitzung zurückgesetzt und verwaltete Spieler-Cheats deaktiviert. Keine veraltete Neustartmeldung, sobald beides ausgeschaltet ist.
@@ -62,4 +63,4 @@ Windows-Build mit Visual Studio MSBuild, .NET-Desktop-SDK und C++-Werkzeugen (CM
 
 ## Urheber und Lizenz
 
-Original-DESRU: **bowsr**; Fork: **IlyaTsyganov**. Integration aus [billymooreqs Projekt](https://github.com/billymooreq/DoomEternal-v1.1--RTXfix-DrlaCollisionViewer). Der Viewer basiert auf IlyaTsyganovs Arbeit mit Erlaubnis des Autors, nicht auf einer pauschalen MIT-Lizenz. meath00k: brongo und Mitwirkende. Siehe [CREDITS](CREDITS.md). DESRU bleibt unter GPL-3.0; Drittkomponenten behalten ihre jeweiligen Bedingungen. Inoffiziell, ohne Unterstützung durch id Software/Bethesda.
+Original-DESRU: **bowsr**. Integration aus [billymooreqs Projekt](https://github.com/billymooreq/DoomEternal-v1.1--RTXfix-DrlaCollisionViewer). Der Viewer enthält Code mit Erlaubnis seines Autors, nicht unter einer pauschalen MIT-Lizenz. meath00k: brongo und Mitwirkende. Siehe [CREDITS](CREDITS.md). DESRU bleibt unter GPL-3.0; Drittkomponenten behalten ihre jeweiligen Bedingungen. Inoffiziell, ohne Unterstützung durch id Software/Bethesda.

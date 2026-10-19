@@ -1,4 +1,4 @@
-﻿<root>
+<root>
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
     <xsd:element name="root" msdata:IsDataSet="true">
@@ -58,13 +58,13 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="textBox1.Text" xml:space="preserve">
-    <value>There is a known issue with DOOM Eternal + DESRU where if your melee/interact action is bound to E or Q, interacting with a modbot may duplicate the input, causing the menu to tab to another weapon.
+    <value>DESRU could not enable Modbot Input Protection for this game session.
 
-If you use E or Q as your main interact key, you will either need to rebind it to another key, or disable the "Enable Max FPS Limit" checkbox in DESRU's options.
+With the internal FPS cap active, holding E or Q to interact with a modbot can also switch its weapon tab.
 
-If you choose to disable the max FPS limiter, you will need to cap your framerate through external means, like RTSS, NVIDIA Control Panel, etc.
+Use another interact key, or disable "Enable Max FPS Limit" and cap FPS externally (RTSS or your graphics driver).
 
-FPS Hotkeys will still work if you disable this option. Just remember to toggle them again before interacting with a modbot to prevent the issue described.</value>
+FPS hotkeys still apply the internal cap and can reintroduce this issue while protection is unavailable.</value>
   </data>
   <assembly alias="System.Drawing" name="System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
   <data name="$this.Icon" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">

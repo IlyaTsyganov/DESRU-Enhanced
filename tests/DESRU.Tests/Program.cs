@@ -14,6 +14,9 @@ internal static class Program {
     [STAThread]
     private static int Main(string[] args) {
         try {
+            if(args.Length==2&&args[0]=="--live-modbot-guard") {
+                LiveModbotInputTests.Run(Math.Clamp(int.Parse(args[1]),10,600));return 0;
+            }
             if(args.Length==2&&args[0]=="--visual-depth-test") {
                 VisualDepthDiagnostic.Run(args[1]);return 0;
             }
@@ -179,6 +182,9 @@ internal static class Program {
                 Check(BitConverter.ToUInt16(native, pe + 4) == 0x8664, "Packaged visual module is x64");
                 Check(System.Text.Encoding.ASCII.GetString(native).Contains("DesruVisualsStart") && System.Text.Encoding.ASCII.GetString(native).Contains("DESRUVisualControl"), "Packaged native bridge exports are present");
                 var packagedAssembly = Assembly.LoadFile(Path.GetFullPath("DESRU.dll"));
+                Check(packagedAssembly.GetName().Version == new Version(1,1,0,0), "Patch keeps the installed settings assembly identity");
+                Check(FileVersionInfo.GetVersionInfo(Path.GetFullPath("DESRU.dll")).FileVersion == "1.1.1.0", "Patch file version identifies the current release independently of the settings identity");
+                Check(packagedAssembly.GetType("DESpeedrunUtil.Overlay.NativeModbotInputGuard") != null, "Standalone includes the tested modbot input protection");
                 var resources = new System.Resources.ResourceManager("DESpeedrunUtil.Properties.Resources", packagedAssembly);
                 foreach(string name in new[] { "HelpPage_OSD", "HelpPage_InfoPanel", "HelpPage_Other" })
                     Check(resources.GetString(name) == DESpeedrunUtil.Properties.Resources.ResourceManager.GetString(name) && resources.GetString(name) != null, "Packaged approved help matches tested source: " + name);
@@ -221,6 +227,7 @@ internal static class Program {
             var tracker = new HorizontalSpeedTracker();
             Check(!(bool) typeof(DESpeedrunUtil.Program).GetMethod("UpdateCheck", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, null)!, "Fork does not query or install upstream updates by default");
             NativeAdapterTests.Run(Check);
+            ModbotInputTests.Run(Check);
             NativeStartupTests.Run(Check);
             CommandDefaultsTests.Run(Check);
             LowHealthTintTests.Run(Check);

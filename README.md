@@ -6,7 +6,7 @@ An unofficial Windows utility for DOOM Eternal, based on [bowsr's DESRU 1.6.17](
 
 ## Install
 
-1. Open [Releases](https://github.com/IlyaTsyganov/DESRU-Enhanced/releases/latest) and download **DESRU-Enhanced-v1.1.0-standalone-win-x64.zip** from Assets. GitHub's “Source code” archives are for developers.
+1. Open [Releases](https://github.com/IlyaTsyganov/DESRU-Enhanced/releases/latest) and download **DESRU-Enhanced-v1.1.1-standalone-win-x64.zip** from Assets. GitHub's “Source code” archives are for developers.
 2. On Windows 10/11 x64, close other DESRU instances and extract the entire archive into a writable folder. Keep its subfolders together. Back up an existing installation/settings before replacing files.
 3. Run **DESRU.exe**, accept the administrator prompt, and select the game directory when requested.
 4. Keep DESRU running and launch DOOM Eternal normally. Either application may be started first; no separate game launcher is required.
@@ -15,6 +15,7 @@ The standalone archive includes the .NET 6.0.36 desktop runtime, application dep
 
 ## Added or changed compared with original DESRU
 
+- Modbot input protection prevents the opening E/Q hold from switching weapon tabs while keeping the internal FPS cap. Fresh presses work after release; the compatibility warning appears only if protection cannot attach. See [details](docs/MODBOT-INPUT.md).
 - Native HUD speedometers show current horizontal speed and the speed captured at the last landing, including the brief landing impulse. They work in exclusive fullscreen and support separate positions/colors, shared size and optional landing display.
 - Low-health tint opacity can be changed for both identified tint layers without changing health or armor.
 - Cheats and meath00k can be enabled/disabled during gameplay. Disabling cheats restores tracked cvars to their pre-session values and clears managed player cheats. The obsolete restart warning is removed when both are off.
@@ -71,4 +72,4 @@ Source builds need the original distribution's fonts/macro/meath00k resources. S
 
 ## Credits and license
 
-Original DESRU: **bowsr**. Fork: **IlyaTsyganov**. Lighting/viewer integration adapts [billymooreq's project](https://github.com/billymooreq/DoomEternal-v1.1--RTXfix-DrlaCollisionViewer); the viewer derives from IlyaTsyganov's work used with the author's permission, not a blanket MIT license. meath00k is by brongo and contributors. See [CREDITS](CREDITS.md) and retained notices. DESRU retains its GPL-3.0 license; third-party components retain their own terms. Unofficial; not endorsed by id Software/Bethesda.
+Original DESRU: **bowsr**. Lighting/viewer integration adapts [billymooreq's project](https://github.com/billymooreq/DoomEternal-v1.1--RTXfix-DrlaCollisionViewer); the viewer includes code used with its author's permission, not a blanket MIT license. meath00k is by brongo and contributors. See [CREDITS](CREDITS.md) and retained notices. DESRU retains its GPL-3.0 license; third-party components retain their own terms. Unofficial; not endorsed by id Software/Bethesda.
