@@ -2,7 +2,7 @@
 
 [English](README.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Русский](README.ru.md)
 
-Ein inoffizielles Windows-Hilfsprogramm für DOOM Eternal, basierend auf [bowsrs DESRU 1.6.17](https://github.com/bowsr/DESRU), gepflegt von IlyaTsyganov. Git-Verlauf und ursprüngliche Urheberangaben bleiben erhalten.
+Ein inoffizielles Windows-Hilfsprogramm für DOOM Eternal, basierend auf [bowsrs DESRU 1.6.17](https://github.com/bowsr/DESRU). Git-Verlauf und ursprüngliche Urheberangaben bleiben erhalten.
 
 ## Installation
 
